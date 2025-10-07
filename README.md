@@ -1,8 +1,4 @@
-# Handwriting Recognition Prototype
-
-This project is a minimal proof of concept for recognizing handwritten English
-and Arabic text using [Next.js](https://nextjs.org) and
-[Tesseract.js](https://github.com/naptha/tesseract.js).
+# Handwriting Recognition
 
 ## Project Info
 
