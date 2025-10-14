@@ -7,10 +7,19 @@
 
 ## Getting Started
 
-Install dependencies and start the development server:
+### 1. Install Dependencies
 
 ```bash
 npm install
+```
+
+### 2. Configure Environment Variables
+
+Add your Firebase and Google Cloud Vision credentials to `.env.local`. See `.env.example` for the required variables.
+
+### 3. Start Development Server
+
+```bash
 npm run dev
 ```
 

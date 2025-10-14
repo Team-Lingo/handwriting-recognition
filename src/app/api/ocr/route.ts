@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextRequest, NextResponse } from "next/server";
 import { ImageAnnotatorClient } from "@google-cloud/vision";
 import os from "os";
@@ -9,35 +8,37 @@ import { detectLanguage } from "@/utils/detectLanguage";
 import type { OcrResponse } from "@/types/ocr";
 
 export const runtime = "nodejs";
-export const dynamic = "force-dynamic"; // no ISR caching
+export const dynamic = "force-dynamic";
 
-// Single client reused across requests
-const visionClient = new ImageAnnotatorClient();
+const visionClient = new ImageAnnotatorClient({
+    credentials: {
+        client_email: process.env.GOOGLE_CLOUD_CLIENT_EMAIL,
+        private_key: process.env.GOOGLE_CLOUD_PRIVATE_KEY?.replace(/\\n/g, "\n"),
+    },
+    projectId: process.env.GOOGLE_CLOUD_PROJECT_ID,
+});
 
 export async function POST(req: NextRequest) {
     try {
-        /* 1 ─── pull the uploaded file from <multipart/form-data> */
         const form = await req.formData();
         const file = form.get("file") as File | null;
         if (!file) {
             return NextResponse.json({ error: "No file provided" }, { status: 400 });
         }
-
-        /* 2 ─── write to a temp file so Vision can read it */
         const tmp = path.join(os.tmpdir(), crypto.randomUUID());
         await fs.writeFile(tmp, Buffer.from(await file.arrayBuffer()));
 
-        /* 3 ─── call Google Cloud Vision OCR */
         const [result] = await visionClient.textDetection(tmp);
-        await fs.unlink(tmp); // clean-up
+        await fs.unlink(tmp);
 
         const text = result.fullTextAnnotation?.text || "";
         const language = detectLanguage(text);
 
         const payload: OcrResponse = { text, language };
         return NextResponse.json(payload);
-    } catch (err: any) {
+    } catch (err) {
         console.error(err);
-        return NextResponse.json({ error: err.message ?? "OCR failed" }, { status: 500 });
+        const message = err instanceof Error ? err.message : "OCR failed";
+        return NextResponse.json({ error: message }, { status: 500 });
     }
 }
