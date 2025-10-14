@@ -1,25 +1,24 @@
 "use client";
-import { useState } from "react";
-import ImageUploader from "@/components/ImageUploader";
-import { OcrResponse } from "@/types/ocr";
+import { useRouter } from "next/navigation";
 
 export default function HomePage() {
-    const [result, setResult] = useState<OcrResponse | null>(null);
+    const router = useRouter();
 
     return (
-        <main className="container">
-            <h1 style={{ fontSize: "1.8rem", fontWeight: 700, marginBottom: "1rem", textAlign: "center" }}>
-                Handwriting Recognition Prototype
-            </h1>
+        <main className="landing-container">
+            <div className="landing-content">
+                <h1 className="landing-title">Handwriting Recognition</h1>
+                <p className="landing-subtitle">Transform handwritten text into digital format using AI</p>
 
-            <ImageUploader onResult={setResult} />
-
-            {result && (
-                <div className="card" style={{ marginTop: "1.5rem" }}>
-                    <p style={{ fontWeight: 600 }}>Detected language: {result.language}</p>
-                    <pre style={{ whiteSpace: "pre-wrap", marginTop: "0.5rem" }}>{result.text}</pre>
+                <div className="landing-buttons">
+                    <button onClick={() => router.push("/register")} className="btn btn-primary">
+                        Register
+                    </button>
+                    <button onClick={() => router.push("/login")} className="btn btn-secondary">
+                        Login
+                    </button>
                 </div>
-            )}
+            </div>
         </main>
     );
 }
