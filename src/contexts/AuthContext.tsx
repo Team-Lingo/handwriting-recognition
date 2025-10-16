@@ -1,6 +1,6 @@
 "use client";
 import { createContext, useContext, useEffect, useState, ReactNode } from "react";
-import { User, onAuthStateChanged, createUserWithEmailAndPassword, signOut as firebaseSignOut } from "firebase/auth";
+import { User, onAuthStateChanged, createUserWithEmailAndPassword ,signInWithEmailAndPassword,signOut as firebaseSignOut } from "firebase/auth";
 import { doc, setDoc, getDoc } from "firebase/firestore";
 import { auth } from "@/lib/firebase";
 import { db } from "@/lib/firebase";
@@ -78,10 +78,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
 
     const signIn = async (email: string, password: string) => {
-        // TODO: Implement sign in functionality
-        // Hint: Use signInWithEmailAndPassword from firebase/auth
-        console.log("Sign in not implemented yet", email, password);
+        await signInWithEmailAndPassword(auth, email, password);
     };
+    
 
     const signOut = async () => {
         await firebaseSignOut(auth);
