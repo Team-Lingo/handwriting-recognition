@@ -1,10 +1,13 @@
 :root {
-    --background: #ffffff;
-    --foreground: #171717;
-    --primary: #0070f3;
-    --secondary: #666;
-    --border: #eaeaea;
-    --error: #e00;
+    --Primary-Blue:#164BA1;
+    --Primary-Dark:#2C3E50;
+    --Main-Text:#181D27;
+    --Secondary-Text:#717680;
+    --Steel-Gray:#ADB4BF;
+    --Borders-Lines:#D5D7DA;
+    --Hover-Active:#E3E8EF;
+    --Landing-Bg:#F0F4FA;
+    --transition: all 0.3s ease;
 }
 
 @media (prefers-color-scheme: dark) {
