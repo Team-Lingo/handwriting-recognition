@@ -1,0 +1,55 @@
+.Container {
+  min-height: 100vh;
+  padding: 2rem;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 1rem;
+  text-align: center;
+  background: var(--Landing-Bg);
+  color: var(--Main-Text);
+  border: 1px dashed var(--Borders-Lines);
+  border-radius: 12px;
+}
+
+.Title {
+  font-size: 2.25rem;
+  font-weight: 700;
+  color: var(--Primary-Dark);
+}
+
+.Subtitle {
+  font-size: 1rem;
+  color: var(--Secondary-Text);
+  max-width: 48ch;
+}
+
+.Badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: var(--Primary-Blue);
+  color: white;
+  padding: 0.4rem 0.75rem;
+  border-radius: 999px;
+  font-size: 0.85rem;
+}
+
+.Cta {
+  margin-top: 1rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: var(--Primary-Blue);
+  color: white;
+  padding: 0.75rem 1.25rem;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.Cta:hover {
+  filter: brightness(0.95);
+}
