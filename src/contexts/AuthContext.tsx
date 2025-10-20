@@ -7,6 +7,8 @@ import {
     signInWithEmailAndPassword,
     signOut as firebaseSignOut,
     sendPasswordResetEmail,
+    GoogleAuthProvider,
+    signInWithPopup,
 } from "firebase/auth";
 import { doc, setDoc, getDoc } from "firebase/firestore";
 import { auth } from "@/lib/firebase";
@@ -25,6 +27,7 @@ interface AuthContextType {
     loading: boolean;
     signUp: (email: string, password: string, firstName: string, lastName: string) => Promise<void>;
     signIn: (email: string, password: string) => Promise<void>;
+    signInWithGoogle: () => Promise<void>;
     signOut: () => Promise<void>;
     resetPassword: (email: string) => Promise<void>;
 }
@@ -110,12 +113,36 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         await sendPasswordResetEmail(auth, trimmed, actionCodeSettings);
     };
 
+    const signInWithGoogle = async () => {
+        try {
+            const provider = new GoogleAuthProvider();
+            const result = await signInWithPopup(auth, provider);
+            const user = result.user;
+
+            // Check if user profile exists, if not create one
+            const userDoc = await getDoc(doc(db, "users", user.uid));
+            if (!userDoc.exists()) {
+                const userProfile: UserProfile = {
+                    firstName: user.displayName?.split(' ')[0] || '',
+                    lastName: user.displayName?.split(' ').slice(1).join(' ') || '',
+                    email: user.email || '',
+                    createdAt: new Date().toISOString(),
+                };
+                await setDoc(doc(db, "users", user.uid), userProfile);
+            }
+        } catch (error) {
+            console.error("Error during Google sign in:", error);
+            throw error;
+        }
+    };
+
     const value = {
         user,
         userProfile,
         loading,
         signUp,
         signIn,
+        signInWithGoogle,
         signOut,
         resetPassword,
     };
