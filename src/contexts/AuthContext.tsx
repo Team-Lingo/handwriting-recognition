@@ -1,6 +1,13 @@
 "use client";
 import { createContext, useContext, useEffect, useState, ReactNode } from "react";
-import { User, onAuthStateChanged, createUserWithEmailAndPassword ,signInWithEmailAndPassword,signOut as firebaseSignOut } from "firebase/auth";
+import {
+    User,
+    onAuthStateChanged,
+    createUserWithEmailAndPassword,
+    signInWithEmailAndPassword,
+    signOut as firebaseSignOut,
+    sendPasswordResetEmail,
+} from "firebase/auth";
 import { doc, setDoc, getDoc } from "firebase/firestore";
 import { auth } from "@/lib/firebase";
 import { db } from "@/lib/firebase";
@@ -19,6 +26,7 @@ interface AuthContextType {
     signUp: (email: string, password: string, firstName: string, lastName: string) => Promise<void>;
     signIn: (email: string, password: string) => Promise<void>;
     signOut: () => Promise<void>;
+    resetPassword: (email: string) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType>({} as AuthContextType);
@@ -80,10 +88,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const signIn = async (email: string, password: string) => {
         await signInWithEmailAndPassword(auth, email, password);
     };
-    
 
     const signOut = async () => {
         await firebaseSignOut(auth);
+    };
+
+    const resetPassword = async (email: string) => {
+        const trimmed = email.trim();
+        // Prefer a known app URL if provided; otherwise use window origin in browser
+        const origin =
+            (typeof window !== "undefined" && window.location.origin) ||
+            process.env.NEXT_PUBLIC_APP_URL;
+
+        const actionCodeSettings = origin
+            ? {
+                  url: `${origin}/login`,
+                  handleCodeInApp: false,
+              }
+            : undefined;
+
+        await sendPasswordResetEmail(auth, trimmed, actionCodeSettings);
     };
 
     const value = {
@@ -93,6 +117,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         signUp,
         signIn,
         signOut,
+        resetPassword,
     };
 
     return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
