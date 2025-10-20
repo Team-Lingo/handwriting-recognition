@@ -44,9 +44,20 @@ export default function DashboardPage() {
                         </p>
                     )}
                 </div>
-                <button onClick={handleSignOut} className="btn btn-secondary">
-                    Sign Out
-                </button>
+                <div className="flex items-center gap-4">
+                    <button 
+                        onClick={() => router.push('/profile')} 
+                        className="btn btn-primary"
+                    >
+                        {userProfile?.firstName}
+                    </button>
+                    <button 
+                        onClick={handleSignOut} 
+                        className="btn btn-secondary"
+                    >
+                        Sign Out
+                    </button>
+                </div>
             </div>
 
             <ImageUploader onResult={setResult} />
