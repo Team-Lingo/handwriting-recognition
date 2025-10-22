@@ -1,0 +1,28 @@
+.stats {
+  background: var(--Primary-Dark);
+  color: #fff;
+}
+
+.stats-wrap {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 32px;
+  align-items: center;
+  text-align: center;
+}
+
+.stat-item {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.stat-value {
+  font-family: var(--font-atkinson), Arial, Helvetica, sans-serif;
+  font-size: 96px;
+  line-height: 1;
+}
+
+.stat-label {
+  font-size: 1.125rem;
+}
