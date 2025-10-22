@@ -50,15 +50,3 @@
 .nav-link.active {
   color: var(--Primary-Blue);
 }
-
-.btn-primary-rounded {
-  background: var(--Primary-Blue);
-  color: #fff;
-  padding: 12px 24px;
-  border-radius: 999px;
-  text-decoration: none;
-  transition: var(--transition);
-}
-.btn-primary-rounded:hover {
-  background: var(--Primary-Dark);
-}

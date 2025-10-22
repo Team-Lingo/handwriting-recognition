@@ -64,7 +64,7 @@ export default function Navbar() {
               </Link>
             </div>
           ) : (
-            <Link href="/register" className="btn-primary-rounded">
+            <Link href="/register" className="btn-primary-solid">
               Get Started
             </Link>
           )}
