@@ -5,6 +5,12 @@ import { useRouter } from "next/navigation";
 
 export default function ComingSoon() {
   const router = useRouter();
+
+  const handleGoHome = () => {
+    console.log("Go home button clicked");
+    router.push("/dashboard");
+  };
+
   return (
     <section className="Container">
       <span className="Badge">🚧 Coming Soon</span>
@@ -15,7 +21,7 @@ export default function ComingSoon() {
         We&apos;re working hard to bring this to you. In the meantime, you can
         use the existing features or return to the dashboard.
       </p>
-      <button className="Cta" onClick={() => router.push("/landing")}>
+      <button className="Cta" onClick={handleGoHome}>
         Go home
       </button>
     </section>
