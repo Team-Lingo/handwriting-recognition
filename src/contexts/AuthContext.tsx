@@ -19,6 +19,7 @@ interface UserProfile {
     lastName: string;
     email: string;
     createdAt: string;
+    role?: "Admin" | "User" | string;
 }
 
 interface AuthContextType {

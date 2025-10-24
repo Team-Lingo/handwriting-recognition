@@ -78,12 +78,22 @@ export default function ProfilePage() {
                         <h2 className="text-2xl font-bold text-gray-900">
                             Profile
                         </h2>
-                        <button
-                            onClick={() => router.push('/dashboard')}
-                            className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-                        >
-                            Back to Dashboard
-                        </button>
+                        <div className="flex gap-2">
+                            {userProfile?.role === 'Admin' && (
+                                <button
+                                    onClick={() => router.push('/admin')}
+                                    className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                                >
+                                    Admin
+                                </button>
+                            )}
+                            <button
+                                onClick={() => router.push('/dashboard')}
+                                className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                            >
+                                Back to Dashboard
+                            </button>
+                        </div>
                     </div>
 
                     {!isEditing ? (

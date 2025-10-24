@@ -4,6 +4,7 @@ export interface UserProfile {
     lastName: string;
     email: string;
     createdAt: string;
+    role?: "Admin" | "User" | string;
 }
 
 // Type definition for form input data

@@ -2,10 +2,42 @@ rules_version='2'
 
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Allow users to create and read their own user document
+    function isSignedIn() { return request.auth != null; }
+    function isAdmin() {
+      return isSignedIn() &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'Admin';
+    }
+
+    // Ensure non-admins cannot set or change role to escalate privileges
+    function ownerKeepsSameRole() {
+      // If the role field exists, it must not change for non-admin updates
+      return request.resource.data.role == resource.data.role;
+    }
+    function roleIsNotAdminOnCreate() {
+      // On create by a non-admin, role must be absent or explicitly 'User'
+      return !("role" in request.resource.data) || request.resource.data.role == 'User';
+    }
+
+    // Users can manage their own profile. Admins can read all users.
     match /users/{userId} {
-      allow create: if request.auth != null && request.auth.uid == userId;
-      allow read, update, delete: if request.auth != null && request.auth.uid == userId;
+      // Create: owner can create their own doc; non-admins cannot grant themselves Admin
+      // Admins may create any user doc if needed
+      allow create: if isSignedIn() && (
+        (request.auth.uid == userId && roleIsNotAdminOnCreate()) || isAdmin()
+      );
+
+      // Read: owner or admin
+      allow read: if isSignedIn() && (request.auth.uid == userId || isAdmin());
+
+      // Update:
+      // - Owner can update their own doc only if the role does not change
+      // - Admin can update any doc (including changing role)
+      allow update: if isSignedIn() && (
+        (request.auth.uid == userId && ownerKeepsSameRole()) || isAdmin()
+      );
+
+      // Delete: owner or admin
+      allow delete: if isSignedIn() && (request.auth.uid == userId || isAdmin());
     }
     
     // Default deny for all other documents
