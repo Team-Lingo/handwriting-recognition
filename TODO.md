@@ -1,4 +1,4 @@
-# TODO: Re-implement AI Logic for Handwriting Recognition
+# TODO: Completed Ai features and  Re-implement AI Logic for Handwriting Recognition
 
 - [x] Update `src/types/ocr.ts` to include optional fields: `correctedText?: string; accuracy?: number; notes?: string[];`
 - [x] Install `fast-levenshtein` package via npm
@@ -9,3 +9,8 @@
   - [x] Extract `notes` from LanguageTool response matches
   - [x] Update payload to include new fields only for English text
 - [x] Test the OCR endpoint to verify functionality (build successful)
+
+- [x] Update LanguageToolMatch interface to include rule object with description and issueType
+- [x] Add getReason function to derive user-friendly explanations
+- [x] Modify notes generation logic to append explanations
+- [x] Ensure no duplicates and preserve existing API structure

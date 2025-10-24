@@ -13,6 +13,46 @@ interface LanguageToolMatch {
     length: number;
     message?: string;
     replacements?: { value: string }[];
+    rule?: {
+        description?: string;
+        issueType?: string;
+    };
+}
+
+function getReason(match: LanguageToolMatch): string {
+    if (match.rule?.description) {
+        // Use the description directly if available
+        return match.rule.description.toLowerCase();
+    }
+    if (match.rule?.issueType) {
+        // Map issueType to user-friendly explanations
+        switch (match.rule.issueType.toLowerCase()) {
+            case 'misspelling':
+                return 'fixed a common spelling mistake';
+            case 'grammar':
+                return 'corrected grammar issue';
+            case 'style':
+                return 'improved writing style';
+            case 'punctuation':
+                return 'fixed punctuation error';
+            case 'typography':
+                return 'corrected typographical issue';
+            case 'duplication':
+                return 'removed duplication';
+            case 'inconsistency':
+                return 'fixed inconsistency';
+            case 'internationalization':
+                return 'corrected internationalization issue';
+            case 'locale_violation':
+                return 'fixed locale-specific rule violation';
+            case 'uncategorized':
+                return 'corrected general error';
+            default:
+                return 'corrected language issue';
+        }
+    }
+    // Fallback if no rule data
+    return 'corrected error';
 }
 
 export const runtime = "nodejs";
@@ -87,7 +127,8 @@ export async function POST(req: NextRequest) {
                                 if (match.replacements && match.replacements.length > 0) {
                                     const original = text.slice(match.offset, match.offset + match.length);
                                     const corrected = match.replacements[0].value;
-                                    return `Corrected "${original}" to "${corrected}"`;
+                                    const reason = getReason(match);
+                                    return `Corrected "${original}" to "${corrected}" → ${reason}`;
                                 }
                                 return match.message || "";
                             })
