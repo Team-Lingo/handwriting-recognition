@@ -99,6 +99,73 @@ export default function ProfilePage() {
                             onCancel={handleCancel}
                         />
                     )}
+
+                    {/* Change Password Section */}
+                    <div className="mt-10 border-t pt-8">
+                        <h3 className="text-lg font-semibold mb-4">Change Password</h3>
+                        {user && user.providerData[0]?.providerId === "password" ? (
+                            <form className="space-y-4" onSubmit={async (e) => {
+                                e.preventDefault();
+                                const form = e.target as HTMLFormElement;
+                                const oldPassword = (form.elements.namedItem('oldPassword') as HTMLInputElement).value;
+                                const newPassword = (form.elements.namedItem('newPassword') as HTMLInputElement).value;
+                                
+                                try {
+                                    const { EmailAuthProvider, reauthenticateWithCredential, updatePassword } = await import('firebase/auth');
+                                    const { auth } = await import('@/lib/firebase');
+                                    const credential = EmailAuthProvider.credential(
+                                        user.email!,
+                                        oldPassword
+                                    );
+                                    
+                                    // First, re-authenticate
+                                    await reauthenticateWithCredential(user, credential);
+                                    
+                                    // Then change password
+                                    await updatePassword(user, newPassword);
+                                    
+                                    // Clear form and show success
+                                    form.reset();
+                                    alert('Password changed successfully!');
+                                } catch (error: any) {
+                                    alert(error.message || 'Failed to change password. Please try again.');
+                                }
+                            }}>
+                                <div>
+                                    <label htmlFor="oldPassword" className="block text-sm font-medium text-gray-700">Old Password</label>
+                                    <input
+                                        type="password"
+                                        id="oldPassword"
+                                        name="oldPassword"
+                                        required
+                                        minLength={6}
+                                        className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                                    />
+                                </div>
+                                <div>
+                                    <label htmlFor="newPassword" className="block text-sm font-medium text-gray-700">New Password</label>
+                                    <input
+                                        type="password"
+                                        id="newPassword"
+                                        name="newPassword"
+                                        required
+                                        minLength={6}
+                                        className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                                    />
+                                </div>
+                                <button
+                                    type="submit"
+                                    className="w-full py-2 px-4 bg-blue-600 text-white font-semibold rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                                >
+                                    Change Password
+                                </button>
+                            </form>
+                        ) : (
+                            <div className="text-yellow-600 text-sm mt-4">
+                                You cannot change your password because you signed up with Google.
+                            </div>
+                        )}
+                    </div>
                 </div>
             </div>
         </div>
