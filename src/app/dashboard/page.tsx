@@ -1,20 +1,57 @@
 "use client";
-import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useEffect, useState, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import ImageUploader from "@/components/ImageUploader";
 import { OcrResponse } from "@/types/ocr";
+import { getDownloadURL, ref } from "firebase/storage";
+import { storage } from "@/lib/firebase";
 
-export default function DashboardPage() {
-    const [result, setResult] = useState<OcrResponse | null>(null);
+function DashboardContent() {
     const { user, userProfile, loading, signOut } = useAuth();
     const router = useRouter();
+    const searchParams = useSearchParams();
+    const [result, setResult] = useState<OcrResponse | null>(null);
+    const [analyzing, setAnalyzing] = useState(false);
+    const [imageUrl, setImageUrl] = useState<string | null>(null);
 
     useEffect(() => {
         if (!loading && !user) {
             router.push("/login");
         }
     }, [user, loading, router]);
+
+    useEffect(() => {
+        const analyzeFile = async () => {
+            const storagePath = searchParams.get("analyze");
+            if (!storagePath || !user) return;
+
+            setAnalyzing(true);
+            try {
+                // Get download URL for both preview and API
+                const url = await getDownloadURL(ref(storage, storagePath));
+                setImageUrl(url);
+
+                // Send download URL to OCR API - server fetches from the signed URL
+                const formData = new FormData();
+                formData.append("fileUrl", url);
+
+                const ocrResponse = await fetch("/api/ocr", {
+                    method: "POST",
+                    body: formData,
+                });
+                const data: OcrResponse = await ocrResponse.json();
+                setResult(data);
+            } catch (error) {
+                console.error("Analysis failed:", error);
+                alert("Failed to analyze image. Please try again.");
+            } finally {
+                setAnalyzing(false);
+            }
+        };
+
+        analyzeFile();
+    }, [searchParams, user]);
 
     if (loading) {
         return (
@@ -45,22 +82,35 @@ export default function DashboardPage() {
                     )}
                 </div>
                 <div className="flex items-center gap-4">
-                    <button
-                        onClick={() => router.push('/profile')}
-                        className="btn btn-primary"
-                    >
+                    <button onClick={() => router.push("/files")} className="btn">
+                        Files
+                    </button>
+                    <button onClick={() => router.push("/profile")} className="btn btn-primary">
                         {userProfile?.firstName}
                     </button>
-                    <button
-                        onClick={handleSignOut}
-                        className="btn btn-secondary"
-                    >
+                    <button onClick={handleSignOut} className="btn btn-secondary">
                         Sign Out
                     </button>
                 </div>
             </div>
 
-            <ImageUploader onResult={setResult} />
+            <ImageUploader />
+
+            {analyzing && (
+                <div className="card" style={{ textAlign: "center", marginTop: "1rem" }}>
+                    <p>Analyzing image...</p>
+                </div>
+            )}
+
+            {imageUrl && !analyzing && (
+                <div className="card" style={{ textAlign: "center", marginTop: "1rem" }}>
+                    <img
+                        src={imageUrl}
+                        alt="Analyzed image"
+                        style={{ maxHeight: "220px", objectFit: "contain", margin: "0 auto" }}
+                    />
+                </div>
+            )}
 
             {result && (
                 <div className="result-card">
@@ -93,5 +143,18 @@ export default function DashboardPage() {
                 </div>
             )}
         </main>
+    );
+}
+
+export default function DashboardPage() {
+    return (
+        <Suspense
+            fallback={
+                <div className="dashboard-container">
+                    <div className="loading">Loading...</div>
+                </div>
+            }>
+            <DashboardContent />
+        </Suspense>
     );
 }

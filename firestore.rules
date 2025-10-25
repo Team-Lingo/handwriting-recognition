@@ -38,6 +38,11 @@ service cloud.firestore {
 
       // Delete: owner or admin
       allow delete: if isSignedIn() && (request.auth.uid == userId || isAdmin());
+
+      // Files subcollection under each user
+      match /files/{fileId} {
+        allow read, write: if request.auth != null && request.auth.uid == userId;
+      }
     }
     
     // Default deny for all other documents
