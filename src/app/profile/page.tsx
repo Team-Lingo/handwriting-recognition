@@ -239,66 +239,129 @@ export default function ProfilePage() {
                                 </button>
                             </form>
                         ) : (
-                            <div className="text-yellow-600 text-sm mt-4">You cannot change your password because you signed up with Google.</div>
+                            (() => {
+                                const pid = user?.providerData[0]?.providerId;
+                                const providerName = pid === 'google.com' ? 'Google' : pid === 'github.com' ? 'GitHub' : 'your identity provider';
+                                return (
+                                    <div className="text-yellow-600 text-sm mt-4">
+                                        You cannot change your password because you signed up with {providerName}.
+                                    </div>
+                                );
+                            })()
                         )}
                     </div>
 
-                    {/* Profile Picture Section */}
-                    <div className="mt-8 border-t pt-8">
-                        <h3 className="text-lg font-semibold mb-2"><strong>Profile Picture</strong></h3>
-
-                        <div className="mb-4">
-                            <div className="flex items-center gap-4">
-                                <div className="text-center">
-                                    <div
-                                        onClick={() => fileInputRef.current?.click()}
-                                        className="w-24 h-24 rounded-full overflow-hidden cursor-pointer mx-auto"
-                                        title="Click to upload/change profile picture"
-                                    >
-                                        {userProfile && (userProfile as any).profilePictureUrl ? (
-                                            <img src={(userProfile as any).profilePictureUrl} alt="Profile" className="w-24 h-24 rounded-full object-cover" />
-                                        ) : (
-                                            <div className="w-24 h-24 rounded-full bg-gray-200 flex items-center justify-center">No image</div>
-                                        )}
+                    {/* Connected Accounts Section */}
+                    <div className="mt-10 border-t pt-8">
+                        <h3 className="text-lg font-semibold mb-4">Connected Accounts</h3>
+                        <div className="space-y-3">
+                            {/* Link/Unlink Google */}
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <div className="font-medium">Google</div>
+                                    <div className="text-sm text-gray-500">
+                                        {user.providerData.some(p => p.providerId === 'google.com') ? 'Connected' : 'Not connected'}
                                     </div>
-
-                                    {/* Remove button under the image, centered */}
-                                    {(userProfile as any)?.profilePictureUrl && (
-                                        <div className="mt-2">
-                                            <button
-                                                type="button"
-                                                onClick={removeProfilePicture}
-                                                className="py-1 px-3 bg-red-600 text-white rounded-md hover:bg-red-700"
-                                            >
-                                                Remove
-                                            </button>
-                                        </div>
-                                    )}
                                 </div>
+                                {user.providerData.some(p => p.providerId === 'google.com') ? (
+                                    <button
+                                        className="px-3 py-1 text-sm rounded-md border border-gray-300 hover:bg-gray-50"
+                                        onClick={async () => {
+                                            try {
+                                                // Prevent unlinking the last provider
+                                                if (user.providerData.length <= 1) {
+                                                    alert('You cannot unlink the only sign-in method.');
+                                                    return;
+                                                }
+                                                const { unlink } = await import('firebase/auth');
+                                                await unlink(user, 'google.com');
+                                                await user.reload();
+                                                alert('Google account unlinked.');
+                                            } catch (err: any) {
+                                                alert(err?.message || 'Failed to unlink Google.');
+                                            }
+                                        }}
+                                    >
+                                        Unlink
+                                    </button>
+                                ) : (
+                                    <button
+                                        className="px-3 py-1 text-sm rounded-md bg-blue-600 text-white hover:bg-blue-700"
+                                        onClick={async () => {
+                                            try {
+                                                const { GoogleAuthProvider, linkWithPopup } = await import('firebase/auth');
+                                                const provider = new GoogleAuthProvider();
+                                                await linkWithPopup(user, provider);
+                                                await user.reload();
+                                                alert('Google account linked.');
+                                            } catch (err: any) {
+                                                // Surface guidance if account exists with different credential
+                                                if (err?.code === 'auth/account-exists-with-different-credential') {
+                                                    alert('This email is already used by another provider. Sign in with that provider first, then link Google.');
+                                                } else {
+                                                    alert(err?.message || 'Failed to link Google.');
+                                                }
+                                            }
+                                        }}
+                                    >
+                                        Link
+                                    </button>
+                                )}
                             </div>
 
-                            <input
-                                type="file"
-                                accept="image/*"
-                                ref={fileInputRef}
-                                className="hidden"
-                                onChange={(e) => {
-                                    setUploadError(null);
-                                    const f = e.target.files && e.target.files[0];
-                                    if (f) {
-                                        setSelectedFile(f);
-                                        // start upload automatically
-                                        uploadFile(f);
-                                    }
-                                }}
-                            />
-
-                            <div className="text-sm text-gray-500 mt-2">Click the image to upload or change your profile picture.</div>
+                            {/* Link/Unlink GitHub */}
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <div className="font-medium">GitHub</div>
+                                    <div className="text-sm text-gray-500">
+                                        {user.providerData.some(p => p.providerId === 'github.com') ? 'Connected' : 'Not connected'}
+                                    </div>
+                                </div>
+                                {user.providerData.some(p => p.providerId === 'github.com') ? (
+                                    <button
+                                        className="px-3 py-1 text-sm rounded-md border border-gray-300 hover:bg-gray-50"
+                                        onClick={async () => {
+                                            try {
+                                                if (user.providerData.length <= 1) {
+                                                    alert('You cannot unlink the only sign-in method.');
+                                                    return;
+                                                }
+                                                const { unlink } = await import('firebase/auth');
+                                                await unlink(user, 'github.com');
+                                                await user.reload();
+                                                alert('GitHub account unlinked.');
+                                            } catch (err: any) {
+                                                alert(err?.message || 'Failed to unlink GitHub.');
+                                            }
+                                        }}
+                                    >
+                                        Unlink
+                                    </button>
+                                ) : (
+                                    <button
+                                        className="px-3 py-1 text-sm rounded-md bg-blue-600 text-white hover:bg-blue-700"
+                                        onClick={async () => {
+                                            try {
+                                                const { GithubAuthProvider, linkWithPopup } = await import('firebase/auth');
+                                                const provider = new GithubAuthProvider();
+                                                provider.addScope('user:email');
+                                                await linkWithPopup(user, provider);
+                                                await user.reload();
+                                                alert('GitHub account linked.');
+                                            } catch (err: any) {
+                                                if (err?.code === 'auth/account-exists-with-different-credential') {
+                                                    alert('This email is already used by another provider. Sign in with that provider first, then link GitHub.');
+                                                } else {
+                                                    alert(err?.message || 'Failed to link GitHub.');
+                                                }
+                                            }
+                                        }}
+                                    >
+                                        Link
+                                    </button>
+                                )}
+                            </div>
                         </div>
-
-                        {uploadProgress !== null && <div className="text-sm mt-2">Progress: {uploadProgress}%</div>}
-                        {uploadError && <div className="text-red-600 text-sm mt-2">{uploadError}</div>}
-                        {successMessage && <div className="text-green-600 text-sm mt-2">{successMessage}</div>}
                     </div>
                 </div>
             </div>

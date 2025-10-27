@@ -10,7 +10,7 @@ export default function LoginForm() {
     const [error, setError] = useState("");
     const [loading, setLoading] = useState(false);
 
-    const { signIn, signInWithGoogle } = useAuth();
+    const { signIn, signInWithGoogle, signInWithGithub } = useAuth();
     const router = useRouter();
 
     const handleGoogleSignIn = async () => {
@@ -19,6 +19,15 @@ export default function LoginForm() {
             router.push("/dashboard");
         } catch (err) {
             setError(err instanceof Error ? err.message : "Google sign in failed");
+        }
+    };
+
+    const handleGithubSignIn = async () => {
+        try {
+            await signInWithGithub();
+            router.push("/dashboard");
+        } catch (err) {
+            setError(err instanceof Error ? err.message : "GitHub sign in failed");
         }
     };
 
@@ -91,6 +100,18 @@ export default function LoginForm() {
                         <path fill="#1976D2" d="M43.611,20.083H42V20H24v8h11.303c-0.792,2.237-2.231,4.166-4.087,5.571c0.001-0.001,0.002-0.001,0.003-0.002l6.19,5.238C36.971,39.205,44,34,44,24C44,22.659,43.862,21.35,43.611,20.083z" />
                     </svg>
                     Sign in with Google
+                </button>
+
+                <button
+                    type="button"
+                    onClick={handleGithubSignIn}
+                    className="btn btn-github mt-2"
+                    disabled={loading}
+                >
+                    <svg className="github-icon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
+                        <path fill="currentColor" d="M12 0C5.37 0 0 5.37 0 12c0 5.3 3.438 9.8 8.205 11.385.6.11.82-.26.82-.58 0-.29-.01-1.05-.015-2.06-3.338.725-4.042-1.61-4.042-1.61-.546-1.387-1.333-1.757-1.333-1.757-1.09-.745.082-.73.082-.73 1.205.085 1.84 1.237 1.84 1.237 1.072 1.835 2.81 1.305 3.495.997.11-.777.42-1.305.763-1.605-2.665-.305-5.466-1.332-5.466-5.93 0-1.31.47-2.38 1.235-3.22-.125-.303-.535-1.523.115-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.4 3-.405 1.02.005 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.655 1.653.245 2.873.12 3.176.77.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.62-5.475 5.92.43.37.81 1.096.81 2.215 0 1.6-.015 2.89-.015 3.285 0 .32.21.695.825.575C20.565 21.795 24 17.295 24 12 24 5.37 18.63 0 12 0z" />
+                    </svg>
+                    <span className="ml-2">Sign in with GitHub</span>
                 </button>
             </form>
         </div>
