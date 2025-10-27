@@ -1,17 +1,16 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useRouter } from "next/navigation";
 import { ProfileForm } from "@/components/ProfileForm";
 import { ProfileView } from "@/components/ProfileView";
 import { ProfileService } from "@/services/profileService";
 import { ProfileFormData } from "@/types/profile";
+import { storage, db } from "@/lib/firebase";
+import { ref as storageRef, uploadBytesResumable, getDownloadURL, deleteObject } from "firebase/storage";
+import { doc, updateDoc, deleteField } from "firebase/firestore";
 
-/**
- * Profile page component that handles user profile management
- * Includes viewing and editing functionality with proper authentication checks
- */
 export default function ProfilePage() {
     // Hooks for authentication, routing and state management
     const { user, userProfile, refreshUserProfile } = useAuth();
@@ -24,33 +23,21 @@ export default function ProfilePage() {
         lastName: userProfile?.lastName || "",
     });
 
-    // Authentication check - redirect to login if not authenticated
+    // Redirect if not authenticated
     if (!user || !userProfile) {
         router.push("/login");
         return null;
     }
 
-    /**
-     * Handles form input changes
-     * @param e - Change event from form inputs
-     */
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const { name, value } = e.target;
-        setFormData((prev) => ({
-            ...prev,
-            [name]: value,
-        }));
+        setFormData((prev) => ({ ...prev, [name]: value }));
     };
 
-    /**
-     * Handles form submission and profile update
-     * @param e - Form submission event
-     */
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         try {
             await ProfileService.updateProfile(user.uid, formData);
-            // Refresh user profile data from Firebase
             await refreshUserProfile();
             setIsEditing(false);
         } catch (error) {
@@ -58,16 +45,122 @@ export default function ProfilePage() {
         }
     };
 
-    /**
-     * Handles cancellation of profile editing
-     * Resets form data to current profile values
-     */
     const handleCancel = () => {
         setIsEditing(false);
-        setFormData({
-            firstName: userProfile.firstName,
-            lastName: userProfile.lastName,
-        });
+        setFormData({ firstName: userProfile.firstName, lastName: userProfile.lastName });
+    };
+
+    // Profile picture upload state
+    const [selectedFile, setSelectedFile] = useState<File | null>(null);
+    const [uploading, setUploading] = useState(false);
+    const [uploadProgress, setUploadProgress] = useState<number | null>(null);
+    const [uploadError, setUploadError] = useState<string | null>(null);
+    const [successMessage, setSuccessMessage] = useState<string | null>(null);
+    const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+    // Upload helper - uploads a File to Storage and updates Firestore
+    const uploadFile = async (file: File) => {
+        setUploadError(null);
+        setSuccessMessage(null);
+        if (!user) {
+            setUploadError("No authenticated user.");
+            return;
+        }
+
+        // Resize image client-side to limit dimensions and reduce upload size
+        const resizeImage = (file: File, maxDim = 300): Promise<File> => {
+            return new Promise((resolve, reject) => {
+                const img = new Image();
+                const reader = new FileReader();
+                reader.onload = () => {
+                    img.src = reader.result as string;
+                };
+                reader.onerror = (e) => reject(e);
+                img.onerror = (e) => reject(e);
+                img.onload = async () => {
+                    const canvas = document.createElement('canvas');
+                    const ctx = canvas.getContext('2d');
+                    if (!ctx) return reject(new Error('Canvas not supported'));
+
+                    const { width, height } = img;
+                    const ratio = Math.min(1, maxDim / Math.max(width, height));
+                    const targetW = Math.round(width * ratio);
+                    const targetH = Math.round(height * ratio);
+                    canvas.width = targetW;
+                    canvas.height = targetH;
+                    ctx.drawImage(img, 0, 0, targetW, targetH);
+
+                    canvas.toBlob((blob) => {
+                        if (!blob) return reject(new Error('Image resize failed'));
+                        const newFile = new File([blob], file.name, { type: blob.type });
+                        resolve(newFile);
+                    }, 'image/jpeg', 0.85);
+                };
+
+                reader.readAsDataURL(file);
+            });
+        };
+
+        try {
+            setUploading(true);
+            // resize before upload to save bandwidth and storage
+            const fileToUpload = await resizeImage(file, 300);
+            const basename = `${Date.now()}_${fileToUpload.name}`;
+            const path = `users/${user.uid}/files/${basename}`;
+            const sRef = storageRef(storage, path);
+            const uploadTask = uploadBytesResumable(sRef, fileToUpload as any);
+
+            await new Promise<void>((resolve, reject) => {
+                uploadTask.on(
+                    "state_changed",
+                    (snapshot) => {
+                        const prog = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+                        setUploadProgress(Math.round(prog));
+                    },
+                    (error) => reject(error),
+                    () => resolve()
+                );
+            });
+
+            const url = await getDownloadURL(sRef);
+            // save both the download URL and storage path so we can remove the object later if needed
+            await updateDoc(doc(db, "users", user.uid), { profilePictureUrl: url, profilePicturePath: path });
+            await refreshUserProfile();
+            setSelectedFile(null);
+            setUploadProgress(null);
+            setSuccessMessage("Profile picture uploaded successfully.");
+        } catch (err: any) {
+            setUploadError(err.message || "Upload failed");
+        } finally {
+            setUploading(false);
+        }
+    };
+
+    // Remove profile picture: delete storage object if path available, and remove fields from user doc
+    const removeProfilePicture = async () => {
+        if (!user) return;
+        const confirmRemove = confirm("Are you sure you want to remove your profile picture?");
+        if (!confirmRemove) return;
+
+        setUploadError(null);
+        setSuccessMessage(null);
+        try {
+            const profilePath = (userProfile as any)?.profilePicturePath;
+            if (profilePath) {
+                try {
+                    await deleteObject(storageRef(storage, profilePath));
+                } catch (err) {
+                    // ignore storage deletion errors but log
+                    console.error("Failed to delete storage object:", err);
+                }
+            }
+
+            await updateDoc(doc(db, "users", user.uid), { profilePictureUrl: deleteField(), profilePicturePath: deleteField() });
+            await refreshUserProfile();
+            setSuccessMessage("Profile picture removed.");
+        } catch (err: any) {
+            setUploadError(err.message || "Failed to remove profile picture");
+        }
     };
 
     return (
@@ -75,32 +168,17 @@ export default function ProfilePage() {
             <div className="max-w-md mx-auto bg-white rounded-lg shadow-lg overflow-hidden">
                 <div className="px-6 py-8">
                     <div className="flex items-center justify-between mb-8">
-                        <h2 className="text-2xl font-bold text-gray-900">
-                            Profile
-                        </h2>
-                        <div className="flex gap-2">
-                            {userProfile?.role === 'Admin' && (
-                                <button
-                                    onClick={() => router.push('/admin')}
-                                    className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-                                >
-                                    Admin
-                                </button>
-                            )}
-                            <button
-                                onClick={() => router.push('/dashboard')}
-                                className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-                            >
-                                Back to Dashboard
-                            </button>
-                        </div>
+                        <h2 className="text-2xl font-bold text-gray-900">Profile</h2>
+                        <button
+                            onClick={() => router.push('/dashboard')}
+                            className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                        >
+                            Back to Dashboard
+                        </button>
                     </div>
 
                     {!isEditing ? (
-                        <ProfileView 
-                            userProfile={userProfile} 
-                            onEdit={() => setIsEditing(true)} 
-                        />
+                        <ProfileView userProfile={userProfile} onEdit={() => setIsEditing(true)} />
                     ) : (
                         <ProfileForm
                             formData={formData}
@@ -119,22 +197,12 @@ export default function ProfilePage() {
                                 const form = e.target as HTMLFormElement;
                                 const oldPassword = (form.elements.namedItem('oldPassword') as HTMLInputElement).value;
                                 const newPassword = (form.elements.namedItem('newPassword') as HTMLInputElement).value;
-                                
+
                                 try {
                                     const { EmailAuthProvider, reauthenticateWithCredential, updatePassword } = await import('firebase/auth');
-                                    const { auth } = await import('@/lib/firebase');
-                                    const credential = EmailAuthProvider.credential(
-                                        user.email!,
-                                        oldPassword
-                                    );
-                                    
-                                    // First, re-authenticate
+                                    const credential = EmailAuthProvider.credential(user.email!, oldPassword);
                                     await reauthenticateWithCredential(user, credential);
-                                    
-                                    // Then change password
                                     await updatePassword(user, newPassword);
-                                    
-                                    // Clear form and show success
                                     form.reset();
                                     alert('Password changed successfully!');
                                 } catch (error: any) {
@@ -171,10 +239,66 @@ export default function ProfilePage() {
                                 </button>
                             </form>
                         ) : (
-                            <div className="text-yellow-600 text-sm mt-4">
-                                You cannot change your password because you signed up with Google.
-                            </div>
+                            <div className="text-yellow-600 text-sm mt-4">You cannot change your password because you signed up with Google.</div>
                         )}
+                    </div>
+
+                    {/* Profile Picture Section */}
+                    <div className="mt-8 border-t pt-8">
+                        <h3 className="text-lg font-semibold mb-2"><strong>Profile Picture</strong></h3>
+
+                        <div className="mb-4">
+                            <div className="flex items-center gap-4">
+                                <div className="text-center">
+                                    <div
+                                        onClick={() => fileInputRef.current?.click()}
+                                        className="w-24 h-24 rounded-full overflow-hidden cursor-pointer mx-auto"
+                                        title="Click to upload/change profile picture"
+                                    >
+                                        {userProfile && (userProfile as any).profilePictureUrl ? (
+                                            <img src={(userProfile as any).profilePictureUrl} alt="Profile" className="w-24 h-24 rounded-full object-cover" />
+                                        ) : (
+                                            <div className="w-24 h-24 rounded-full bg-gray-200 flex items-center justify-center">No image</div>
+                                        )}
+                                    </div>
+
+                                    {/* Remove button under the image, centered */}
+                                    {(userProfile as any)?.profilePictureUrl && (
+                                        <div className="mt-2">
+                                            <button
+                                                type="button"
+                                                onClick={removeProfilePicture}
+                                                className="py-1 px-3 bg-red-600 text-white rounded-md hover:bg-red-700"
+                                            >
+                                                Remove
+                                            </button>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+
+                            <input
+                                type="file"
+                                accept="image/*"
+                                ref={fileInputRef}
+                                className="hidden"
+                                onChange={(e) => {
+                                    setUploadError(null);
+                                    const f = e.target.files && e.target.files[0];
+                                    if (f) {
+                                        setSelectedFile(f);
+                                        // start upload automatically
+                                        uploadFile(f);
+                                    }
+                                }}
+                            />
+
+                            <div className="text-sm text-gray-500 mt-2">Click the image to upload or change your profile picture.</div>
+                        </div>
+
+                        {uploadProgress !== null && <div className="text-sm mt-2">Progress: {uploadProgress}%</div>}
+                        {uploadError && <div className="text-red-600 text-sm mt-2">{uploadError}</div>}
+                        {successMessage && <div className="text-green-600 text-sm mt-2">{successMessage}</div>}
                     </div>
                 </div>
             </div>
