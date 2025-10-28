@@ -16,6 +16,7 @@ import {
 import { doc, setDoc, getDoc } from "firebase/firestore";
 import { auth } from "@/lib/firebase";
 import { db } from "@/lib/firebase";
+import type { FirebaseError } from "firebase/app";
 
 interface UserProfile {
     firstName: string;
@@ -23,6 +24,8 @@ interface UserProfile {
     email: string;
     createdAt: string;
     role?: "Admin" | "User" | string;
+    profilePictureUrl?: string;
+    profilePicturePath?: string;
 }
 
 interface AuthContextType {
@@ -72,7 +75,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                         await setDoc(userRef, profile);
                         setUserProfile(profile);
                     }
-                } catch (error) {
+                } catch (error: unknown) {
                     console.error("Error fetching user profile:", error);
                 }
             } else {
@@ -102,7 +105,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             };
 
             await setDoc(doc(db, "users", user.uid), userProfile);
-        } catch (error) {
+        } catch (error: unknown) {
             console.error("Error during sign up:", error);
             throw error;
         }
@@ -119,9 +122,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const resetPassword = async (email: string) => {
         const trimmed = email.trim();
         // Prefer a known app URL if provided; otherwise use window origin in browser
-        const origin =
-            (typeof window !== "undefined" && window.location.origin) ||
-            process.env.NEXT_PUBLIC_APP_URL;
+        const origin = (typeof window !== "undefined" && window.location.origin) || process.env.NEXT_PUBLIC_APP_URL;
 
         const actionCodeSettings = origin
             ? {
@@ -134,7 +135,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
 
     const refreshUserProfile = async () => {
-        if (user) { // means that the user is logged in
+        if (user) {
+            // means that the user is logged in
             try {
                 const userDoc = await getDoc(doc(db, "users", user.uid));
                 if (userDoc.exists()) {
@@ -156,14 +158,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             const userDoc = await getDoc(doc(db, "users", user.uid));
             if (!userDoc.exists()) {
                 const userProfile: UserProfile = {
-                    firstName: user.displayName?.split(' ')[0] || '',
-                    lastName: user.displayName?.split(' ').slice(1).join(' ') || '',
-                    email: user.email || '',
+                    firstName: user.displayName?.split(" ")[0] || "",
+                    lastName: user.displayName?.split(" ").slice(1).join(" ") || "",
+                    email: user.email || "",
                     createdAt: new Date().toISOString(),
                 };
                 await setDoc(doc(db, "users", user.uid), userProfile);
             }
-        } catch (error) {
+        } catch (error: unknown) {
             // Handle account linking if the email already exists with a different provider
             // https://firebase.google.com/docs/auth/web/google-signin#handle_the_sign-in_flow_with_the_firebase_sdk
             // @ts-expect-error Firebase error typing with customData
@@ -171,13 +173,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             if (code === "auth/account-exists-with-different-credential") {
                 // @ts-expect-error Firebase error typing with customData
                 const email = error?.customData?.email as string | undefined;
-                const pendingCred = GoogleAuthProvider.credentialFromError(error as any);
+                const pendingCred = GoogleAuthProvider.credentialFromError(error as FirebaseError);
                 if (email && pendingCred) {
                     const methods = await fetchSignInMethodsForEmail(auth, email);
                     if (methods.includes("github.com")) {
                         // Sign in with the provider that already owns this email, then link
                         const ghProvider = new GithubAuthProvider();
-                        ghProvider.addScope('user:email');
+                        ghProvider.addScope("user:email");
                         const ghResult = await signInWithPopup(auth, ghProvider);
                         await linkWithCredential(ghResult.user, pendingCred);
                         return; // linked and signed in
@@ -201,7 +203,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         try {
             const provider = new GithubAuthProvider();
             // Request access to user's email addresses to populate profile email
-            provider.addScope('user:email');
+            provider.addScope("user:email");
             const result = await signInWithPopup(auth, provider);
             const user = result.user;
 
@@ -209,21 +211,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             let email = user.email || "";
             if (!email) {
                 try {
-                    const cred = GithubAuthProvider.credentialFromResult(result as any);
+                    const cred = GithubAuthProvider.credentialFromResult(result);
                     const accessToken = cred?.accessToken;
                     if (accessToken) {
-                        const resp = await fetch('https://api.github.com/user/emails', {
+                        const resp = await fetch("https://api.github.com/user/emails", {
                             headers: { Authorization: `token ${accessToken}` },
                         });
                         if (resp.ok) {
-                            const emails: Array<{email: string; primary: boolean; verified: boolean}> = await resp.json();
-                            const primary = emails.find(e => e.primary && e.verified) || emails.find(e => e.primary) || emails[0];
+                            const emails: Array<{ email: string; primary: boolean; verified: boolean }> =
+                                await resp.json();
+                            const primary =
+                                emails.find((e) => e.primary && e.verified) ||
+                                emails.find((e) => e.primary) ||
+                                emails[0];
                             if (primary?.email) {
                                 email = primary.email;
                             }
                         }
                     }
-                } catch (e) {
+                } catch {
                     // ignore and continue
                 }
             }
@@ -242,14 +248,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 };
                 await setDoc(doc(db, "users", user.uid), userProfile);
             }
-        } catch (error) {
+        } catch (error: unknown) {
             // Handle account linking when email exists with a different provider
             // @ts-expect-error Firebase error typing with customData
             const code = error?.code as string | undefined;
             if (code === "auth/account-exists-with-different-credential") {
                 // @ts-expect-error Firebase error typing with customData
                 const email = error?.customData?.email as string | undefined;
-                const pendingCred = GithubAuthProvider.credentialFromError(error as any);
+                const pendingCred = GithubAuthProvider.credentialFromError(error as FirebaseError);
                 if (email && pendingCred) {
                     const methods = await fetchSignInMethodsForEmail(auth, email);
                     if (methods.includes("google.com")) {
@@ -272,8 +278,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             throw error;
         }
     };
-    
-    
 
     const value = {
         user,

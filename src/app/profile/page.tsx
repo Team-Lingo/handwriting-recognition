@@ -23,6 +23,12 @@ export default function ProfilePage() {
         lastName: userProfile?.lastName || "",
     });
 
+    // Profile picture upload state
+    const [uploadProgress, setUploadProgress] = useState<number | null>(null);
+    const [uploadError, setUploadError] = useState<string | null>(null);
+    const [successMessage, setSuccessMessage] = useState<string | null>(null);
+    const fileInputRef = useRef<HTMLInputElement | null>(null);
+
     // Redirect if not authenticated
     if (!user || !userProfile) {
         router.push("/login");
@@ -50,14 +56,6 @@ export default function ProfilePage() {
         setFormData({ firstName: userProfile.firstName, lastName: userProfile.lastName });
     };
 
-    // Profile picture upload state
-    const [selectedFile, setSelectedFile] = useState<File | null>(null);
-    const [uploading, setUploading] = useState(false);
-    const [uploadProgress, setUploadProgress] = useState<number | null>(null);
-    const [uploadError, setUploadError] = useState<string | null>(null);
-    const [successMessage, setSuccessMessage] = useState<string | null>(null);
-    const fileInputRef = useRef<HTMLInputElement | null>(null);
-
     // Upload helper - uploads a File to Storage and updates Firestore
     const uploadFile = async (file: File) => {
         setUploadError(null);
@@ -78,9 +76,9 @@ export default function ProfilePage() {
                 reader.onerror = (e) => reject(e);
                 img.onerror = (e) => reject(e);
                 img.onload = async () => {
-                    const canvas = document.createElement('canvas');
-                    const ctx = canvas.getContext('2d');
-                    if (!ctx) return reject(new Error('Canvas not supported'));
+                    const canvas = document.createElement("canvas");
+                    const ctx = canvas.getContext("2d");
+                    if (!ctx) return reject(new Error("Canvas not supported"));
 
                     const { width, height } = img;
                     const ratio = Math.min(1, maxDim / Math.max(width, height));
@@ -90,11 +88,15 @@ export default function ProfilePage() {
                     canvas.height = targetH;
                     ctx.drawImage(img, 0, 0, targetW, targetH);
 
-                    canvas.toBlob((blob) => {
-                        if (!blob) return reject(new Error('Image resize failed'));
-                        const newFile = new File([blob], file.name, { type: blob.type });
-                        resolve(newFile);
-                    }, 'image/jpeg', 0.85);
+                    canvas.toBlob(
+                        (blob) => {
+                            if (!blob) return reject(new Error("Image resize failed"));
+                            const newFile = new File([blob], file.name, { type: blob.type });
+                            resolve(newFile);
+                        },
+                        "image/jpeg",
+                        0.85
+                    );
                 };
 
                 reader.readAsDataURL(file);
@@ -102,13 +104,12 @@ export default function ProfilePage() {
         };
 
         try {
-            setUploading(true);
             // resize before upload to save bandwidth and storage
             const fileToUpload = await resizeImage(file, 300);
             const basename = `${Date.now()}_${fileToUpload.name}`;
             const path = `users/${user.uid}/files/${basename}`;
             const sRef = storageRef(storage, path);
-            const uploadTask = uploadBytesResumable(sRef, fileToUpload as any);
+            const uploadTask = uploadBytesResumable(sRef, fileToUpload);
 
             await new Promise<void>((resolve, reject) => {
                 uploadTask.on(
@@ -126,13 +127,11 @@ export default function ProfilePage() {
             // save both the download URL and storage path so we can remove the object later if needed
             await updateDoc(doc(db, "users", user.uid), { profilePictureUrl: url, profilePicturePath: path });
             await refreshUserProfile();
-            setSelectedFile(null);
             setUploadProgress(null);
             setSuccessMessage("Profile picture uploaded successfully.");
-        } catch (err: any) {
-            setUploadError(err.message || "Upload failed");
-        } finally {
-            setUploading(false);
+        } catch (err) {
+            const error = err as Error;
+            setUploadError(error.message || "Upload failed");
         }
     };
 
@@ -145,7 +144,7 @@ export default function ProfilePage() {
         setUploadError(null);
         setSuccessMessage(null);
         try {
-            const profilePath = (userProfile as any)?.profilePicturePath;
+            const profilePath = userProfile?.profilePicturePath as string | undefined;
             if (profilePath) {
                 try {
                     await deleteObject(storageRef(storage, profilePath));
@@ -155,11 +154,15 @@ export default function ProfilePage() {
                 }
             }
 
-            await updateDoc(doc(db, "users", user.uid), { profilePictureUrl: deleteField(), profilePicturePath: deleteField() });
+            await updateDoc(doc(db, "users", user.uid), {
+                profilePictureUrl: deleteField(),
+                profilePicturePath: deleteField(),
+            });
             await refreshUserProfile();
             setSuccessMessage("Profile picture removed.");
-        } catch (err: any) {
-            setUploadError(err.message || "Failed to remove profile picture");
+        } catch (err) {
+            const error = err as Error;
+            setUploadError(error.message || "Failed to remove profile picture");
         }
     };
 
@@ -170,9 +173,8 @@ export default function ProfilePage() {
                     <div className="flex items-center justify-between mb-8">
                         <h2 className="text-2xl font-bold text-gray-900">Profile</h2>
                         <button
-                            onClick={() => router.push('/dashboard')}
-                            className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-                        >
+                            onClick={() => router.push("/dashboard")}
+                            className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
                             Back to Dashboard
                         </button>
                     </div>
@@ -192,25 +194,33 @@ export default function ProfilePage() {
                     <div className="mt-10 border-t pt-8">
                         <h3 className="text-lg font-semibold mb-4">Change Password</h3>
                         {user && user.providerData[0]?.providerId === "password" ? (
-                            <form className="space-y-4" onSubmit={async (e) => {
-                                e.preventDefault();
-                                const form = e.target as HTMLFormElement;
-                                const oldPassword = (form.elements.namedItem('oldPassword') as HTMLInputElement).value;
-                                const newPassword = (form.elements.namedItem('newPassword') as HTMLInputElement).value;
+                            <form
+                                className="space-y-4"
+                                onSubmit={async (e) => {
+                                    e.preventDefault();
+                                    const form = e.target as HTMLFormElement;
+                                    const oldPassword = (form.elements.namedItem("oldPassword") as HTMLInputElement)
+                                        .value;
+                                    const newPassword = (form.elements.namedItem("newPassword") as HTMLInputElement)
+                                        .value;
 
-                                try {
-                                    const { EmailAuthProvider, reauthenticateWithCredential, updatePassword } = await import('firebase/auth');
-                                    const credential = EmailAuthProvider.credential(user.email!, oldPassword);
-                                    await reauthenticateWithCredential(user, credential);
-                                    await updatePassword(user, newPassword);
-                                    form.reset();
-                                    alert('Password changed successfully!');
-                                } catch (error: any) {
-                                    alert(error.message || 'Failed to change password. Please try again.');
-                                }
-                            }}>
+                                    try {
+                                        const { EmailAuthProvider, reauthenticateWithCredential, updatePassword } =
+                                            await import("firebase/auth");
+                                        const credential = EmailAuthProvider.credential(user.email!, oldPassword);
+                                        await reauthenticateWithCredential(user, credential);
+                                        await updatePassword(user, newPassword);
+                                        form.reset();
+                                        alert("Password changed successfully!");
+                                    } catch (error) {
+                                        const err = error as Error;
+                                        alert(err.message || "Failed to change password. Please try again.");
+                                    }
+                                }}>
                                 <div>
-                                    <label htmlFor="oldPassword" className="block text-sm font-medium text-gray-700">Old Password</label>
+                                    <label htmlFor="oldPassword" className="block text-sm font-medium text-gray-700">
+                                        Old Password
+                                    </label>
                                     <input
                                         type="password"
                                         id="oldPassword"
@@ -221,7 +231,9 @@ export default function ProfilePage() {
                                     />
                                 </div>
                                 <div>
-                                    <label htmlFor="newPassword" className="block text-sm font-medium text-gray-700">New Password</label>
+                                    <label htmlFor="newPassword" className="block text-sm font-medium text-gray-700">
+                                        New Password
+                                    </label>
                                     <input
                                         type="password"
                                         id="newPassword"
@@ -233,15 +245,19 @@ export default function ProfilePage() {
                                 </div>
                                 <button
                                     type="submit"
-                                    className="w-full py-2 px-4 bg-blue-600 text-white font-semibold rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-                                >
+                                    className="w-full py-2 px-4 bg-blue-600 text-white font-semibold rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
                                     Change Password
                                 </button>
                             </form>
                         ) : (
                             (() => {
                                 const pid = user?.providerData[0]?.providerId;
-                                const providerName = pid === 'google.com' ? 'Google' : pid === 'github.com' ? 'GitHub' : 'your identity provider';
+                                const providerName =
+                                    pid === "google.com"
+                                        ? "Google"
+                                        : pid === "github.com"
+                                        ? "GitHub"
+                                        : "your identity provider";
                                 return (
                                     <div className="text-yellow-600 text-sm mt-4">
                                         You cannot change your password because you signed up with {providerName}.
@@ -249,6 +265,70 @@ export default function ProfilePage() {
                                 );
                             })()
                         )}
+                    </div>
+
+                    {/* Profile Picture Section */}
+                    <div className="mt-8 border-t pt-8">
+                        <h3 className="text-lg font-semibold mb-2">
+                            <strong>Profile Picture</strong>
+                        </h3>
+                        <div className="mb-4">
+                            <div className="flex items-center gap-4">
+                                <div className="text-center">
+                                    <div
+                                        onClick={() => fileInputRef.current?.click()}
+                                        className="w-24 h-24 rounded-full overflow-hidden cursor-pointer mx-auto"
+                                        title="Click to upload/change profile picture">
+                                        {userProfile && userProfile.profilePictureUrl ? (
+                                            <img
+                                                src={userProfile.profilePictureUrl}
+                                                alt="Profile"
+                                                className="w-24 h-24 rounded-full object-cover"
+                                            />
+                                        ) : (
+                                            <div className="w-24 h-24 rounded-full bg-gray-200 flex items-center justify-center">
+                                                No image
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    {/* Remove button under the image, centered */}
+                                    {userProfile?.profilePictureUrl && (
+                                        <div className="mt-2">
+                                            <button
+                                                type="button"
+                                                onClick={removeProfilePicture}
+                                                className="py-1 px-3 bg-red-600 text-white rounded-md hover:bg-red-700">
+                                                Remove
+                                            </button>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+
+                            <input
+                                type="file"
+                                accept="image/*"
+                                ref={fileInputRef}
+                                className="hidden"
+                                onChange={(e) => {
+                                    setUploadError(null);
+                                    const f = e.target.files?.[0];
+                                    if (f) {
+                                        // start upload automatically
+                                        uploadFile(f);
+                                    }
+                                }}
+                            />
+
+                            <div className="text-sm text-gray-500 mt-2">
+                                Click the image to upload or change your profile picture.
+                            </div>
+                        </div>
+
+                        {uploadProgress !== null && <div className="text-sm mt-2">Progress: {uploadProgress}%</div>}
+                        {uploadError && <div className="text-red-600 text-sm mt-2">{uploadError}</div>}
+                        {successMessage && <div className="text-green-600 text-sm mt-2">{successMessage}</div>}
                     </div>
 
                     {/* Connected Accounts Section */}
@@ -260,28 +340,30 @@ export default function ProfilePage() {
                                 <div>
                                     <div className="font-medium">Google</div>
                                     <div className="text-sm text-gray-500">
-                                        {user.providerData.some(p => p.providerId === 'google.com') ? 'Connected' : 'Not connected'}
+                                        {user.providerData.some((p) => p.providerId === "google.com")
+                                            ? "Connected"
+                                            : "Not connected"}
                                     </div>
                                 </div>
-                                {user.providerData.some(p => p.providerId === 'google.com') ? (
+                                {user.providerData.some((p) => p.providerId === "google.com") ? (
                                     <button
                                         className="px-3 py-1 text-sm rounded-md border border-gray-300 hover:bg-gray-50"
                                         onClick={async () => {
                                             try {
                                                 // Prevent unlinking the last provider
                                                 if (user.providerData.length <= 1) {
-                                                    alert('You cannot unlink the only sign-in method.');
+                                                    alert("You cannot unlink the only sign-in method.");
                                                     return;
                                                 }
-                                                const { unlink } = await import('firebase/auth');
-                                                await unlink(user, 'google.com');
+                                                const { unlink } = await import("firebase/auth");
+                                                await unlink(user, "google.com");
                                                 await user.reload();
-                                                alert('Google account unlinked.');
-                                            } catch (err: any) {
-                                                alert(err?.message || 'Failed to unlink Google.');
+                                                alert("Google account unlinked.");
+                                            } catch (err) {
+                                                const error = err as Error;
+                                                alert(error?.message || "Failed to unlink Google.");
                                             }
-                                        }}
-                                    >
+                                        }}>
                                         Unlink
                                     </button>
                                 ) : (
@@ -289,21 +371,25 @@ export default function ProfilePage() {
                                         className="px-3 py-1 text-sm rounded-md bg-blue-600 text-white hover:bg-blue-700"
                                         onClick={async () => {
                                             try {
-                                                const { GoogleAuthProvider, linkWithPopup } = await import('firebase/auth');
+                                                const { GoogleAuthProvider, linkWithPopup } = await import(
+                                                    "firebase/auth"
+                                                );
                                                 const provider = new GoogleAuthProvider();
                                                 await linkWithPopup(user, provider);
                                                 await user.reload();
-                                                alert('Google account linked.');
-                                            } catch (err: any) {
+                                                alert("Google account linked.");
+                                            } catch (err) {
+                                                const error = err as { code?: string; message?: string };
                                                 // Surface guidance if account exists with different credential
-                                                if (err?.code === 'auth/account-exists-with-different-credential') {
-                                                    alert('This email is already used by another provider. Sign in with that provider first, then link Google.');
+                                                if (error?.code === "auth/account-exists-with-different-credential") {
+                                                    alert(
+                                                        "This email is already used by another provider. Sign in with that provider first, then link Google."
+                                                    );
                                                 } else {
-                                                    alert(err?.message || 'Failed to link Google.');
+                                                    alert(error?.message || "Failed to link Google.");
                                                 }
                                             }
-                                        }}
-                                    >
+                                        }}>
                                         Link
                                     </button>
                                 )}
@@ -314,27 +400,29 @@ export default function ProfilePage() {
                                 <div>
                                     <div className="font-medium">GitHub</div>
                                     <div className="text-sm text-gray-500">
-                                        {user.providerData.some(p => p.providerId === 'github.com') ? 'Connected' : 'Not connected'}
+                                        {user.providerData.some((p) => p.providerId === "github.com")
+                                            ? "Connected"
+                                            : "Not connected"}
                                     </div>
                                 </div>
-                                {user.providerData.some(p => p.providerId === 'github.com') ? (
+                                {user.providerData.some((p) => p.providerId === "github.com") ? (
                                     <button
                                         className="px-3 py-1 text-sm rounded-md border border-gray-300 hover:bg-gray-50"
                                         onClick={async () => {
                                             try {
                                                 if (user.providerData.length <= 1) {
-                                                    alert('You cannot unlink the only sign-in method.');
+                                                    alert("You cannot unlink the only sign-in method.");
                                                     return;
                                                 }
-                                                const { unlink } = await import('firebase/auth');
-                                                await unlink(user, 'github.com');
+                                                const { unlink } = await import("firebase/auth");
+                                                await unlink(user, "github.com");
                                                 await user.reload();
-                                                alert('GitHub account unlinked.');
-                                            } catch (err: any) {
-                                                alert(err?.message || 'Failed to unlink GitHub.');
+                                                alert("GitHub account unlinked.");
+                                            } catch (err) {
+                                                const error = err as Error;
+                                                alert(error?.message || "Failed to unlink GitHub.");
                                             }
-                                        }}
-                                    >
+                                        }}>
                                         Unlink
                                     </button>
                                 ) : (
@@ -342,21 +430,25 @@ export default function ProfilePage() {
                                         className="px-3 py-1 text-sm rounded-md bg-blue-600 text-white hover:bg-blue-700"
                                         onClick={async () => {
                                             try {
-                                                const { GithubAuthProvider, linkWithPopup } = await import('firebase/auth');
+                                                const { GithubAuthProvider, linkWithPopup } = await import(
+                                                    "firebase/auth"
+                                                );
                                                 const provider = new GithubAuthProvider();
-                                                provider.addScope('user:email');
+                                                provider.addScope("user:email");
                                                 await linkWithPopup(user, provider);
                                                 await user.reload();
-                                                alert('GitHub account linked.');
-                                            } catch (err: any) {
-                                                if (err?.code === 'auth/account-exists-with-different-credential') {
-                                                    alert('This email is already used by another provider. Sign in with that provider first, then link GitHub.');
+                                                alert("GitHub account linked.");
+                                            } catch (err) {
+                                                const error = err as { code?: string; message?: string };
+                                                if (error?.code === "auth/account-exists-with-different-credential") {
+                                                    alert(
+                                                        "This email is already used by another provider. Sign in with that provider first, then link GitHub."
+                                                    );
                                                 } else {
-                                                    alert(err?.message || 'Failed to link GitHub.');
+                                                    alert(error?.message || "Failed to link GitHub.");
                                                 }
                                             }
-                                        }}
-                                    >
+                                        }}>
                                         Link
                                     </button>
                                 )}

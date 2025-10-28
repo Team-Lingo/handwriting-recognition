@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 import { ImageAnnotatorClient } from "@google-cloud/vision";
-import os from "os";
 import path from "path";
 import fs from "fs/promises";
 import crypto from "crypto";
@@ -73,6 +72,8 @@ export async function POST(req: NextRequest) {
         const fileUrl = form.get("fileUrl") as string | null;
 
         let tmp: string;
+        const tmpBase = path.join(process.cwd(), ".tmp");
+        await fs.mkdir(tmpBase, { recursive: true });
 
         if (fileUrl) {
             // Fetch from provided URL (signed Firebase Storage URL)
@@ -81,11 +82,11 @@ export async function POST(req: NextRequest) {
                 throw new Error("Failed to fetch file from URL");
             }
             const buffer = Buffer.from(await response.arrayBuffer());
-            tmp = path.join(os.tmpdir(), crypto.randomUUID());
+            tmp = path.join(tmpBase, crypto.randomUUID());
             await fs.writeFile(tmp, buffer);
         } else if (file) {
             // Use uploaded file
-            tmp = path.join(os.tmpdir(), crypto.randomUUID());
+            tmp = path.join(tmpBase, crypto.randomUUID());
             await fs.writeFile(tmp, Buffer.from(await file.arrayBuffer()));
         } else {
             return NextResponse.json({ error: "No file or fileUrl provided" }, { status: 400 });

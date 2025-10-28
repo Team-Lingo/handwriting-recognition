@@ -5,6 +5,8 @@ export interface UserProfile {
     email: string;
     createdAt: string;
     role?: "Admin" | "User" | string;
+    profilePictureUrl?: string;
+    profilePicturePath?: string;
 }
 
 // Type definition for form input data

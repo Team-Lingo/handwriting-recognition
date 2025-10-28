@@ -6,6 +6,7 @@ import { collection, getDocs, doc, updateDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
 import type { UserProfile } from "@/types/profile";
+import { FirebaseError } from "firebase/app";
 
 interface UserRow extends UserProfile {
   id: string;
@@ -43,11 +44,16 @@ export default function AdminPage() {
         const snap = await getDocs(collection(db, "users"));
         const list: UserRow[] = snap.docs.map((d) => ({ id: d.id, ...(d.data() as UserProfile) }));
         setUsers(list);
-      } catch (err) {
+      } catch (err: unknown) {
         console.error("Failed to load users:", err);
-        const message = (err as any)?.code === "permission-denied"
-          ? "Permission denied. Ensure Firestore rules allow Admins to read the users collection and that your user has role 'Admin'."
-          : (err as any)?.message || "Unknown error fetching users.";
+        let message = "Unknown error fetching users.";
+        if (err instanceof FirebaseError) {
+          message = err.code === "permission-denied"
+            ? "Permission denied. Ensure Firestore rules allow Admins to read the users collection and that your user has role 'Admin'."
+            : err.message;
+        } else if (err instanceof Error) {
+          message = err.message;
+        }
         setFetchError(message);
       } finally {
         setFetching(false);
@@ -72,9 +78,10 @@ export default function AdminPage() {
       setUpdating((m) => ({ ...m, [targetUser.id]: true }));
       await updateDoc(doc(db, "users", targetUser.id), { role: newRole });
       setUsers((list) => list.map((u) => (u.id === targetUser.id ? { ...u, role: newRole } : u)));
-    } catch (err) {
+    } catch (err: unknown) {
       console.error("Failed to update role:", err);
-      alert((err as any)?.message || "Failed to update role");
+      const message = err instanceof FirebaseError ? err.message : err instanceof Error ? err.message : "Failed to update role";
+      alert(message);
     } finally {
       setUpdating((m) => ({ ...m, [targetUser.id]: false }));
     }
