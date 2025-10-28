@@ -1,0 +1,75 @@
+.document-card {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 1rem;
+    background: #ffffff;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    transition: all 200ms ease-in-out;
+    cursor: pointer;
+}
+
+.document-card:hover {
+    background: var(--Hover-Active);
+    box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+}
+
+.document-icon-wrapper {
+    width: 40px;
+    height: 40px;
+    background: var(--Landing-Bg);
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.document-icon {
+    font-size: 1.25rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--Primary-Blue);
+}
+
+.document-icon svg {
+    width: 1.25rem;
+    height: 1.25rem;
+}
+.document-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.document-title {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--Main-Text);
+    margin: 0 0 0.25rem 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.document-meta {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.875rem;
+    color: var(--Secondary-Text);
+}
+
+.document-language {
+    color: var(--Main-Text);
+    font-weight: 500;
+}
+
+.document-separator {
+    color: var(--Steel-Gray);
+}
+
+.document-time {
+    color: var(--Secondary-Text);
+}
