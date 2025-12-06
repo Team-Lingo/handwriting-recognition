@@ -1,0 +1,403 @@
+.container {
+  position: relative;
+  width: 100vw;
+  height: 100vh;
+  background-color: var(--Hover-Active);
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.formContainer {
+  position: absolute;
+  top: 0;
+  height: 100%;
+  transition: all 0.4s ease-in-out;
+  width: 66.66%;
+  z-index: 1;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.signInForm {
+  left: 0;
+  z-index: 2;
+  opacity: 1;
+}
+
+.container.active .signInForm {
+  transform: translateX(50%);
+  opacity: 0;
+}
+
+.signUpForm {
+  left: 0;
+  opacity: 0;
+  z-index: 1;
+}
+
+.container.active .signUpForm {
+  transform: translateX(50%);
+  opacity: 1;
+  z-index: 5;
+}
+
+.form {
+  background-color: white;
+  border-radius: 20px;
+  box-shadow: 0 4px 24px rgba(204, 102, 102, 0.15),
+    0 1.5px 6px rgba(34, 34, 34, 0.1), 0 0.5px 1.5px rgba(163, 3, 31, 0.08);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  padding: 2rem 8rem;
+  height: auto;
+  width: 100%;
+  max-width: 700px;
+  text-align: center;
+}
+
+.inputGroup {
+  display: flex;
+  align-items: center;
+  text-align: left;
+  gap: 0.5rem;
+  width: 100%;
+  margin-bottom: 2rem;
+}
+
+.inputGroup label {
+  flex: 1;
+  font-size: 24px;
+  font-weight: 400;
+}
+
+.inputGroup input {
+  flex: 2;
+  background-color: var(--Landing-Bg);
+  padding: 1rem 0.5rem;
+  border: 1px solid var(--Primary-Blue);
+  border-radius: 20px;
+  font-size: 20px;
+  outline: none;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.inputGroup input:focus {
+  box-shadow: 0 0 0 2px var(--Primary-Blue);
+}
+
+.title {
+  margin: 0;
+  margin-bottom: 2rem;
+  font-size: 48px;
+  font-weight: 700;
+  color: var(--Main-Text);
+}
+
+.button {
+  background-color: var(--Primary-Blue);
+  color: white;
+  border: 4px solid var(--Primary-Blue);
+  padding: 1rem 2rem;
+  font-size: 24px;
+  font-weight: 700;
+  cursor: pointer;
+  border-radius: 25px;
+  transition: var(--transition);
+}
+
+.toggleButton {
+  color: white;
+  border: 4px solid white;
+  background-color: var(--Primary-Dark);
+  margin-top: 2rem;
+  padding: 1rem 2rem;
+  font-size: 32px;
+  font-weight: 700;
+  cursor: pointer;
+  border-radius: 25px;
+  transition: var(--transition);
+}
+
+.button:hover {
+  background-color: var(--Primary-Dark);
+  border-color: var(--Primary-Dark);
+}
+
+.toggleButton:hover {
+  background-color: white;
+  color: var(--Primary-Dark);
+}
+
+.errorMessage {
+  color: #dc143c;
+  margin-top: 1rem;
+  font-size: 20px;
+}
+
+.forgotPassword {
+  text-decoration: none;
+  color: var(--Primary-Blue);
+  font-size: 20px;
+  margin-top: 1rem;
+  text-decoration: none;
+  transition: var(--transition);
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+
+.forgotPassword:hover {
+  text-decoration: underline;
+}
+
+.toggleContainer {
+  position: absolute;
+  top: 0;
+  left: 66.66%;
+  width: 33.33%;
+  height: 100%;
+  overflow: hidden;
+  transition: all 0.6s ease-in-out;
+  z-index: 100;
+}
+
+.container.active .toggleContainer {
+  transform: translateX(-200%);
+}
+
+.toggle {
+  background-color: var(--Primary-Blue);
+  height: 100%;
+  width: 200%;
+  position: relative;
+  color: white;
+  left: -100%;
+  transform: translateX(0);
+  transition: all 0.6s ease-in-out;
+}
+
+.container.active .toggle {
+  transform: translateX(50%);
+}
+
+.togglePanel {
+  position: absolute;
+  top: 0;
+  width: 50%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 0 30px;
+  text-align: center;
+  transition: all 0.6s ease-in-out;
+}
+
+.toggleLeft {
+  transform: translateX(-200%);
+}
+
+.container.active .toggleLeft {
+  transform: translateX(-8%);
+}
+
+.toggleRight {
+  left: 50%;
+  transform: translateX(-7%);
+}
+
+.container.active .toggleRight {
+  transform: translateX(200%);
+}
+
+.togglePanel h2 {
+  font-size: 48px;
+  font-weight: 700;
+  margin: 0;
+  margin-bottom: 3rem;
+}
+
+/* Tablet Styles */
+@media screen and (min-width: 769px) and (max-width: 1024px) {
+  .form {
+    padding: 1.5rem 4rem;
+    max-width: 450px;
+  }
+
+  .title {
+    font-size: 28px;
+    margin-bottom: 1.5rem;
+  }
+
+  .inputGroup label {
+    font-size: 18px;
+  }
+
+  .inputGroup input {
+    padding: 1rem 0.8rem;
+    font-size: 14px;
+    border-radius: 15px;
+  }
+
+  .inputGroup {
+    margin-bottom: 1.5rem;
+  }
+
+  .button,
+  .toggleButton {
+    font-size: 16px;
+    padding: 0.8rem 1.5rem;
+    border-radius: 20px;
+  }
+  .button {
+    border: 2px solid var(--Primary-Blue);
+  }
+  .toggleButton {
+    border: 2px solid white;
+  }
+
+  .togglePanel h2 {
+    font-size: 24px;
+    margin-bottom: 2rem;
+  }
+
+  .forgotPassword,
+  .errorMessage {
+    font-size: 14px;
+  }
+}
+
+.mobileToggleWrapper {
+  display: none;
+}
+.mobileToggleButton {
+  display: none;
+}
+
+@media screen and (max-width: 768px) {
+  .container {
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: flex-start;
+    width: 100vw;
+    padding: 0;
+  }
+  .formContainer {
+    position: static;
+    width: 100vw;
+    height: auto;
+    align-items: flex-start;
+    justify-content: flex-start;
+    padding: 0;
+    opacity: 1;
+    transform: translateY(0);
+  }
+  .formContainer.switching {
+    opacity: 0;
+    transform: translateY(30px) scale(0.98);
+    pointer-events: none;
+  }
+  .form {
+    padding: 1rem 1rem;
+    max-width: 100vw;
+    min-width: 0;
+    border-radius: 0;
+    box-shadow: none;
+  }
+  .inputGroup {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.25rem;
+    margin-bottom: 1rem;
+  }
+  .inputGroup label {
+    font-size: 16px;
+    margin-bottom: 0.25rem;
+  }
+  .inputGroup input {
+    font-size: 14px;
+    padding: 0.75rem 0.5rem;
+    border-radius: 10px;
+  }
+
+  .title {
+    font-size: 22px;
+    margin-bottom: 1rem;
+  }
+  .button,
+  .toggleButton {
+    font-size: 14px;
+    padding: 0.6rem 1rem;
+    border-radius: 15px;
+    width: 100%;
+    margin-top: 0.5rem;
+  }
+  .button {
+    border: 2px solid var(--Primary-Blue);
+  }
+  .toggleButton {
+    border: 2px solid white;
+  }
+  .errorMessage,
+  .forgotPassword {
+    font-size: 12px;
+    margin-top: 0.5rem;
+  }
+  .toggleContainer {
+    display: none;
+  }
+  .togglePanel {
+    display: none;
+  }
+  .signInForm,
+  .signUpForm {
+    left: 0;
+    width: 100vw;
+    min-width: 0;
+    max-width: 100vw;
+    padding: 0;
+    opacity: 1 !important;
+    transform: none !important;
+    z-index: 2;
+  }
+  .mobileToggleWrapper {
+    width: 100vw;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background-color: var(--Primary-Blue);
+    height: 100%;
+  }
+  .mobileToggleButton {
+    display: block;
+    background-color: var(--Primary-Blue);
+    color: white;
+    border: 2px solid white;
+    border-radius: 15px;
+    font-size: 16px;
+    font-weight: 700;
+    padding: 0.7rem 1.5rem;
+    cursor: pointer;
+    transition: var(--transition);
+  }
+  .mobileToggleButton:hover {
+    background-color: white;
+    color: var(--Primary-Blue);
+  }
+  .mobileToggleTitle {
+    font-size: 20px;
+    font-weight: 700;
+    margin: 0;
+    margin-bottom: 1rem;
+    color: white;
+    padding: 0 1rem;
+    text-align: center;
+  }
+}

@@ -1,0 +1,380 @@
+.loading-button {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem 3rem;
+  font-size: 24px;
+  font-weight: 700;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  border: none;
+  border-radius: 25px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  min-width: 120px;
+  min-height: 50px;
+  overflow: hidden;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.loading-button.primary {
+  background: var(--Primary-Blue);
+  color: white;
+  border: none;
+}
+
+.loading-button.primary:hover:not(:disabled) {
+  background: var(--Primary-Dark);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(22, 75, 161, 0.3);
+}
+
+.loading-button.primary:active:not(:disabled) {
+  transform: translateY(0);
+  box-shadow: 0 2px 6px rgba(22, 75, 161, 0.3);
+}
+
+.loading-button.secondary {
+  background: #f8f9fa;
+  color: var(--Primary-Blue);
+  border: 2px solid #e9ecef;
+}
+
+.loading-button.secondary:hover:not(:disabled) {
+  background: #e9ecef;
+  border-color: var(--Primary-Blue);
+  color: var(--Primary-Dark);
+}
+
+.loading-button.success {
+  background: #28a745;
+  color: white;
+}
+
+.loading-button.success:hover:not(:disabled) {
+  background: #218838;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(40, 167, 69, 0.3);
+}
+
+.loading-button.danger {
+  background: #dc143c;
+  color: white;
+}
+
+.loading-button.danger:hover:not(:disabled) {
+  background: #b01030;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(220, 20, 60, 0.3);
+}
+
+.loading-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+  transform: none !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1) !important;
+}
+
+.loading-button.loading {
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.loading-button.loading .button-text {
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.loading-button.loading .loading-spinner {
+  opacity: 1;
+}
+
+.button-text {
+  transition: opacity 0.3s ease;
+  z-index: 2;
+  position: relative;
+}
+
+.loading-spinner {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  z-index: 3;
+}
+
+.riot-progress {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.1) 25%,
+    rgba(255, 255, 255, 0.3) 50%,
+    rgba(255, 255, 255, 0.1) 75%,
+    transparent 100%
+  );
+  animation: riotProgress 2s ease-in-out infinite;
+  border-radius: 25px;
+}
+
+@keyframes riotProgress {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+.downloading-bar {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  height: 3px;
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0.8),
+    #ffffff,
+    rgba(255, 255, 255, 0.8)
+  );
+  animation: downloadProgress 1.5s ease-in-out infinite;
+  border-radius: 0 0 25px 25px;
+}
+
+@keyframes downloadProgress {
+  0% {
+    width: 0%;
+    opacity: 0.8;
+  }
+  50% {
+    width: 100%;
+    opacity: 1;
+  }
+  100% {
+    width: 100%;
+    opacity: 0.8;
+  }
+}
+
+.loading-pulse {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: radial-gradient(
+    circle,
+    rgba(255, 255, 255, 0.1) 0%,
+    transparent 70%
+  );
+  animation: pulseGlow 1.5s ease-in-out infinite;
+  border-radius: 25px;
+}
+
+@keyframes pulseGlow {
+  0%,
+  100% {
+    opacity: 0.3;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.8;
+    transform: scale(1.05);
+  }
+}
+
+.hexagon-spinner {
+  width: 24px;
+  height: 24px;
+  position: relative;
+}
+
+.hexagon-spinner::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: white;
+  clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
+  animation: hexagonSpin 1.2s linear infinite;
+}
+
+.loading-button.secondary .hexagon-spinner::before {
+  background: var(--Primary-Blue);
+}
+
+@keyframes hexagonSpin {
+  0% {
+    transform: rotate(0deg) scale(0.8);
+    opacity: 1;
+  }
+  50% {
+    transform: rotate(180deg) scale(1.2);
+    opacity: 0.7;
+  }
+  100% {
+    transform: rotate(360deg) scale(0.8);
+    opacity: 1;
+  }
+}
+
+.riot-spinner {
+  width: 20px;
+  height: 20px;
+  border: 2px solid transparent;
+  border-top: 2px solid white;
+  border-right: 2px solid white;
+  border-radius: 50%;
+  animation: riotSpin 1s linear infinite;
+  position: relative;
+}
+
+.riot-spinner::after {
+  content: "";
+  position: absolute;
+  top: -2px;
+  left: -2px;
+  right: -2px;
+  bottom: -2px;
+  border: 2px solid transparent;
+  border-bottom: 2px solid rgba(255, 255, 255, 0.3);
+  border-left: 2px solid rgba(255, 255, 255, 0.3);
+  border-radius: 50%;
+  animation: riotSpin 1.5s linear infinite reverse;
+}
+
+.loading-button.secondary .riot-spinner {
+  border-top: 2px solid var(--Primary-Blue);
+  border-right: 2px solid var(--Primary-Blue);
+}
+
+.loading-button.secondary .riot-spinner::after {
+  border-bottom: 2px solid rgba(22, 75, 161, 0.3);
+  border-left: 2px solid rgba(22, 75, 161, 0.3);
+}
+
+@keyframes riotSpin {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+.dots-spinner {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+
+.dots-spinner div {
+  width: 6px;
+  height: 6px;
+  background-color: white;
+  border-radius: 50%;
+  animation: dotsAnimation 1.4s ease-in-out infinite both;
+}
+
+.loading-button.secondary .dots-spinner div {
+  background-color: var(--Primary-Blue);
+}
+
+.dots-spinner div:nth-child(1) {
+  animation-delay: -0.32s;
+}
+.dots-spinner div:nth-child(2) {
+  animation-delay: -0.16s;
+}
+.dots-spinner div:nth-child(3) {
+  animation-delay: 0;
+}
+
+@keyframes dotsAnimation {
+  0%,
+  80%,
+  100% {
+    transform: scale(0.8);
+    opacity: 0.5;
+  }
+  40% {
+    transform: scale(1.2);
+    opacity: 1;
+  }
+}
+
+.loading-button.small {
+  padding: 10px 20px;
+  font-size: 14px;
+  min-width: 100px;
+  min-height: 40px;
+  border-radius: 20px;
+}
+
+.loading-button.small .hexagon-spinner {
+  width: 18px;
+  height: 18px;
+}
+
+.loading-button.small .riot-spinner {
+  width: 16px;
+  height: 16px;
+}
+
+.loading-button.large {
+  padding: 18px 36px;
+  font-size: 18px;
+  min-width: 160px;
+  min-height: 60px;
+  border-radius: 30px;
+}
+
+.loading-button.large .hexagon-spinner {
+  width: 28px;
+  height: 28px;
+}
+
+.loading-button.large .riot-spinner {
+  width: 24px;
+  height: 24px;
+}
+
+.loading-button.full-width {
+  width: 100%;
+}
+
+.loading-button:focus {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(22, 75, 161, 0.3), 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.loading-button.secondary:focus {
+  box-shadow: 0 0 0 3px rgba(22, 75, 161, 0.2), 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.loading-button::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 0;
+  height: 0;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.2);
+  transform: translate(-50%, -50%);
+  transition: width 0.4s, height 0.4s;
+  z-index: 1;
+}
+
+.loading-button:active:not(:disabled)::before {
+  width: 200px;
+  height: 200px;
+}
