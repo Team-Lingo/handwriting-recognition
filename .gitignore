@@ -42,3 +42,6 @@ next-env.d.ts
 
 # local markdown files
 *.local.md
+
+# local history
+/.tmp/
