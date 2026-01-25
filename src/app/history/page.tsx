@@ -8,7 +8,7 @@ import { listUserFiles } from "@/services/filesService";
 import type { UserFileRecord } from "@/types/file";
 import { getDownloadURL, ref } from "firebase/storage";
 import { storage } from "@/lib/firebase";
-import "../dashboard-new/dashboard.css";
+import "../dashboard/dashboard.css";
 
 function timeAgo(date: Date): string {
     const seconds = Math.floor((Date.now() - date.getTime()) / 1000);

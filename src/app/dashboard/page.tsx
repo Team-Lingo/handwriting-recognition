@@ -18,7 +18,7 @@ import DocumentCard from "@/components/Dashboard/DocumentCard";
 import QuickRecognition from "@/components/Dashboard/QuickRecognition";
 import { getUserFilesCount, listUserFiles } from "@/services/filesService";
 import type { UserFileRecord } from "@/types/file";
-import "../dashboard-new/dashboard.css";
+import "./dashboard.css";
 
 function startOfTodayLocal(): Date {
     const d = new Date();

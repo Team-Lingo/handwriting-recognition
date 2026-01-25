@@ -3,7 +3,17 @@ import { useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
-import { MdDashboard, MdHistory, MdEmail, MdSettings, MdExpandMore, MdExpandLess, MdLogout } from "react-icons/md";
+import {
+    MdDashboard,
+    MdHistory,
+    MdEmail,
+    MdSettings,
+    MdExpandMore,
+    MdExpandLess,
+    MdLogout,
+    MdDescription,
+    MdTranslate,
+} from "react-icons/md";
 import { User } from "firebase/auth";
 import { UserProfile } from "@/types/profile";
 import { useAuth } from "@/contexts/AuthContext";
@@ -23,6 +33,8 @@ interface SidebarItem {
 
 const sidebarItems: SidebarItem[] = [
     { id: "dashboard", label: "Dashboard", icon: <MdDashboard />, href: "/dashboard" },
+    { id: "documents", label: "Documents", icon: <MdDescription />, href: "/documents" },
+    { id: "language-detection", label: "Language Detection", icon: <MdTranslate />, href: "/language-detection" },
     { id: "history", label: "History", icon: <MdHistory />, href: "/history" },
 ];
 
@@ -38,6 +50,8 @@ export default function DashboardSidebar({ user, userProfile }: DashboardSidebar
     const [isMenuOpen, setIsMenuOpen] = useState(false);
 
     const derivedActiveId = (() => {
+        if (pathname?.startsWith("/documents")) return "documents";
+        if (pathname?.startsWith("/language-detection")) return "language-detection";
         if (pathname?.startsWith("/history")) return "history";
         if (pathname?.startsWith("/contact")) return "contact";
         if (pathname?.startsWith("/profile")) return "settings";

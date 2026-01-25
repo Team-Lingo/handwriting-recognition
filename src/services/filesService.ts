@@ -2,6 +2,7 @@ import {
     collection,
     doc,
     getCountFromServer,
+    getDoc,
     getDocs,
     limit,
     orderBy,
@@ -42,8 +43,8 @@ function normalizeStats(input: unknown): UserOcrStats {
     const avgAccuracy = isFiniteNumber(v.avgAccuracy)
         ? v.avgAccuracy
         : accuracyCount > 0
-        ? accuracySum / accuracyCount
-        : null;
+          ? accuracySum / accuracyCount
+          : null;
     const languages = (v.languages && typeof v.languages === "object" ? v.languages : {}) as Record<string, number>;
     return { analyzedCount, accuracyCount, accuracySum, avgAccuracy, languages };
 }
@@ -67,6 +68,13 @@ export async function listUserFiles(uid: string, max: number = 50): Promise<User
     }
 }
 
+export async function getUserFile(uid: string, fileId: string): Promise<UserFileRecord | null> {
+    const ref = doc(db, `users/${uid}/files/${fileId}`);
+    const snap = await getDoc(ref);
+    if (!snap.exists()) return null;
+    return { fileId: snap.id, ...(snap.data() as DocumentData) } as UserFileRecord;
+}
+
 export async function getUserFilesCount(uid: string): Promise<number> {
     const colRef = collection(db, `users/${uid}/files`);
     try {
@@ -82,7 +90,7 @@ export async function getUserFilesCount(uid: string): Promise<number> {
 export async function upsertUserFileRecord(
     uid: string,
     fileId: string,
-    payload: Omit<Partial<WithFieldValue<UserFileRecord>>, "fileId">
+    payload: Omit<Partial<WithFieldValue<UserFileRecord>>, "fileId">,
 ): Promise<void> {
     const ref = doc(db, `users/${uid}/files/${fileId}`);
     const data: WithFieldValue<UserFileRecord> = {

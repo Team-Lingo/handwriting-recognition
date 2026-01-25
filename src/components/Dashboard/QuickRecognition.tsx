@@ -1,6 +1,7 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { MdImage, MdSlideshow, MdPictureAsPdf, MdCloudUpload } from "react-icons/md";
+import { useRouter } from "next/navigation";
 import { ref, uploadBytes } from "firebase/storage";
 import { storage } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
@@ -10,8 +11,10 @@ import "./QuickRecognition.css";
 
 export default function QuickRecognition() {
     const { user, refreshUserProfile } = useAuth();
+    const router = useRouter();
     const [selectedFormat, setSelectedFormat] = useState<"image" | "powerpoint" | "pdf">("image");
     const [selectedFile, setSelectedFile] = useState<File | null>(null);
+    const [previewUrl, setPreviewUrl] = useState<string | null>(null);
     const [recognizedText, setRecognizedText] = useState("");
     const [recognizedMeta, setRecognizedMeta] = useState<Pick<
         OcrResponse,
@@ -25,8 +28,8 @@ export default function QuickRecognition() {
         selectedFormat === "image"
             ? "Supported formats - JPG, PNG"
             : selectedFormat === "pdf"
-            ? "Supported formats - PDF"
-            : "Supported formats - PPTX";
+              ? "Supported formats - PDF"
+              : "Supported formats - PPTX";
 
     const accept =
         selectedFormat === "image" ? "image/jpeg,image/png" : selectedFormat === "pdf" ? "application/pdf" : ".pptx";
@@ -35,8 +38,34 @@ export default function QuickRecognition() {
         selectedFormat === "image"
             ? "Drop your image here or click to browse"
             : selectedFormat === "pdf"
-            ? "Drop your PDF here or click to browse"
-            : "Drop your PPTX here or click to browse";
+              ? "Drop your PDF here or click to browse"
+              : "Drop your PPTX here or click to browse";
+
+    useEffect(() => {
+        if (!selectedFile) {
+            setPreviewUrl(null);
+            return;
+        }
+
+        if (!selectedFile.type.startsWith("image/")) {
+            setPreviewUrl(null);
+            return;
+        }
+
+        const url = URL.createObjectURL(selectedFile);
+        setPreviewUrl(url);
+        return () => URL.revokeObjectURL(url);
+    }, [selectedFile]);
+
+    const fileDetails = useMemo(() => {
+        if (!selectedFile) return null;
+        const sizeKb = Math.round(((selectedFile.size || 0) / 1024) * 10) / 10;
+        return {
+            name: selectedFile.name,
+            contentType: selectedFile.type || "—",
+            sizeLabel: Number.isFinite(sizeKb) ? `${sizeKb} KB` : "—",
+        };
+    }, [selectedFile]);
 
     const createFileId = () =>
         globalThis.crypto && "randomUUID" in globalThis.crypto
@@ -154,8 +183,14 @@ export default function QuickRecognition() {
                             onChange={handleFileUpload}
                         />
                         <label htmlFor="file-upload" className="upload-label">
-                            <div className="upload-icon">
-                                <MdCloudUpload />
+                            <div className="upload-preview-wrapper">
+                                {previewUrl ? (
+                                    <img src={previewUrl} alt="Selected" className="upload-preview" />
+                                ) : (
+                                    <div className="upload-icon">
+                                        <MdCloudUpload />
+                                    </div>
+                                )}
                             </div>
                             <p className="upload-text">{uploadText}</p>
                             <p className="upload-subtext">{supportedText}</p>
@@ -169,17 +204,42 @@ export default function QuickRecognition() {
                             <p className="output-placeholder">Recognizing…</p>
                         ) : error ? (
                             <p className="output-placeholder">{error}</p>
-                        ) : recognizedText ? (
+                        ) : recognizedText || selectedFile ? (
                             <div className="recognized-text">
-                                {recognizedMeta && (
-                                    <div style={{ marginBottom: 12, fontSize: 12, color: "var(--Secondary-Text)" }}>
-                                        <span>Language: {recognizedMeta.language}</span>
-                                        {typeof recognizedMeta.accuracy === "number" && (
-                                            <span>{` • Accuracy: ${recognizedMeta.accuracy}%`}</span>
-                                        )}
+                                <div className="qr-details">
+                                    <div className="qr-detail-row">
+                                        <span className="qr-detail-label">File</span>
+                                        <span className="qr-detail-value">{fileDetails?.name || "—"}</span>
+                                    </div>
+                                    <div className="qr-detail-row">
+                                        <span className="qr-detail-label">Type</span>
+                                        <span className="qr-detail-value">{fileDetails?.contentType || "—"}</span>
+                                    </div>
+                                    <div className="qr-detail-row">
+                                        <span className="qr-detail-label">Size</span>
+                                        <span className="qr-detail-value">{fileDetails?.sizeLabel || "—"}</span>
+                                    </div>
+                                    <div className="qr-detail-row">
+                                        <span className="qr-detail-label">Language</span>
+                                        <span className="qr-detail-value">{recognizedMeta?.language || "—"}</span>
+                                    </div>
+                                    <div className="qr-detail-row">
+                                        <span className="qr-detail-label">Accuracy</span>
+                                        <span className="qr-detail-value">
+                                            {typeof recognizedMeta?.accuracy === "number"
+                                                ? `${recognizedMeta.accuracy}%`
+                                                : "—"}
+                                        </span>
+                                    </div>
+                                </div>
+
+                                {recognizedText ? (
+                                    <div className="qr-text-preview">{recognizedText}</div>
+                                ) : (
+                                    <div className="qr-text-preview qr-text-preview--empty">
+                                        Upload a file to run recognition.
                                     </div>
                                 )}
-                                {recognizedText}
                             </div>
                         ) : (
                             <p className="output-placeholder">Upload a file to see the converted text here</p>
@@ -188,8 +248,15 @@ export default function QuickRecognition() {
                     <button
                         className="recognize-btn"
                         disabled={!selectedFile || busy || !user}
-                        onClick={() => selectedFile && void runRecognition(selectedFile)}>
-                        {busy ? "Recognizing…" : "Recognize text"}
+                        onClick={() => {
+                            if (busy) return;
+                            if (recognizedText && lastFileId) {
+                                router.push(`/documents?fileId=${encodeURIComponent(lastFileId)}`);
+                                return;
+                            }
+                            if (selectedFile) void runRecognition(selectedFile);
+                        }}>
+                        {busy ? "Recognizing…" : recognizedText && lastFileId ? "Discover more" : "Recognize text"}
                     </button>
                 </div>
             </div>

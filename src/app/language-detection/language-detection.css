@@ -1,0 +1,145 @@
+.ld-upload-card {
+    display: grid;
+    gap: 12px;
+}
+
+.ld-file-input {
+    display: none;
+}
+
+.ld-dropzone {
+    width: 100%;
+    min-height: 320px;
+    border: 2px dashed rgba(0, 0, 0, 0.2);
+    border-radius: 14px;
+    background: #f4f8ff;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    position: relative;
+    padding: 20px;
+}
+
+.ld-dropzone:hover {
+    border-color: rgba(34, 94, 168, 0.65);
+}
+
+.ld-dropzone-placeholder {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    text-align: center;
+}
+
+.ld-drop-icon {
+    font-size: 54px;
+    color: rgba(34, 94, 168, 0.55);
+}
+
+.ld-drop-title {
+    font-weight: 800;
+    color: var(--Main-Text);
+    margin-top: 2px;
+}
+
+.ld-drop-subtitle {
+    font-size: 13px;
+    color: var(--Secondary-Text);
+}
+
+.ld-drop-formats {
+    font-size: 11px;
+    color: rgba(0, 0, 0, 0.45);
+}
+
+.ld-upload-btn {
+    width: min(340px, 92%);
+    height: 44px;
+    border-radius: 999px;
+    border: none;
+    background: var(--Primary-Blue);
+    color: white;
+    font-weight: 800;
+    cursor: pointer;
+}
+
+.ld-upload-btn:hover:not(:disabled) {
+    background: var(--Primary-Dark);
+}
+
+.ld-upload-btn:disabled {
+    opacity: 0.65;
+    cursor: not-allowed;
+}
+
+.ld-preview {
+    width: min(720px, 100%);
+    max-height: 260px;
+    object-fit: contain;
+    border-radius: 12px;
+    border: 1px solid rgba(0, 0, 0, 0.08);
+    background: #fff;
+    padding: 10px;
+}
+
+.ld-result {
+    padding: 10px 12px;
+    border-radius: 12px;
+    border: 1px solid var(--Borders-Lines);
+    background: #fff;
+    font-weight: 700;
+}
+
+.ld-result--ok {
+    color: var(--Main-Text);
+}
+
+.ld-result--error {
+    background: #fff5f5;
+    border-color: #ffd1d1;
+    color: #a1001a;
+}
+
+.ld-stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 16px;
+}
+
+.ld-stat-card {
+    background: #fff;
+    border: 1px solid rgba(0, 0, 0, 0.18);
+    border-radius: 14px;
+    padding: 18px;
+    text-align: center;
+    box-shadow: 0 6px 14px rgba(0, 0, 0, 0.06);
+}
+
+.ld-stat-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: 999px;
+    background: rgba(34, 94, 168, 0.1);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--Primary-Blue);
+    font-size: 20px;
+    margin: 0 auto 10px;
+}
+
+.ld-stat-title {
+    font-weight: 900;
+    color: var(--Main-Text);
+    margin-bottom: 8px;
+}
+
+.ld-stat-body {
+    font-size: 12px;
+    line-height: 1.5;
+    color: var(--Secondary-Text);
+}
