@@ -55,6 +55,7 @@ export default function DocumentsClient() {
 
     const [busyList, setBusyList] = useState(false);
     const [busyUpload, setBusyUpload] = useState(false);
+    const [busyAnalyze, setBusyAnalyze] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
     const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -106,12 +107,78 @@ export default function DocumentsClient() {
             if (!rec) return;
 
             setActiveFile(rec);
-            const url = urls[rec.fileId] || "";
-            setActiveUrl(url);
+            const cached = urls[rec.fileId];
+            if (cached) {
+                setActiveUrl(cached);
+            } else {
+                try {
+                    const u = await getDownloadURL(storageRef(storage, rec.storagePath));
+                    setUrls((prev) => ({ ...prev, [rec.fileId]: u }));
+                    setActiveUrl(u);
+                } catch {
+                    setActiveUrl("");
+                }
+            }
         };
 
         void select();
     }, [user, requestedFileId, files, urls]);
+
+    const analyzeExisting = async (rec: UserFileRecord, url: string) => {
+        if (!user) return;
+        if (!url) return;
+        if (busyAnalyze) return;
+        if (rec.status === "analyzed" && rec.ocr) return;
+
+        setBusyAnalyze(true);
+        setError(null);
+        try {
+            const resp = await fetch(url);
+            if (!resp.ok) throw new Error("Failed to download file for analysis");
+            const blob = await resp.blob();
+
+            const file = new File([blob], rec.name || "document", {
+                type: rec.contentType || blob.type || "application/octet-stream",
+            });
+
+            const formData = new FormData();
+            formData.append("file", file);
+            const res = await fetch("/api/ocr", { method: "POST", body: formData });
+            if (!res.ok) {
+                const body = await res.json().catch(() => ({}));
+                throw new Error(body?.error || "OCR failed");
+            }
+
+            const data: OcrResponse = await res.json();
+            await setUserFileOcrResult(user.uid, rec.fileId, data);
+            await refreshUserProfile();
+
+            const next = await getUserFile(user.uid, rec.fileId);
+            if (next) setActiveFile(next);
+            await loadFiles();
+        } catch (e) {
+            const message = (e as Error).message || "Failed to analyze";
+            setError(message);
+            try {
+                await setUserFileFailed(user.uid, rec.fileId, message);
+            } catch {
+                // ignore
+            }
+        } finally {
+            setBusyAnalyze(false);
+        }
+    };
+
+    useEffect(() => {
+        if (!user) return;
+        if (!activeFile) return;
+        if (!activeUrl) return;
+        if (activeFile.status === "failed") return;
+        if (activeFile.status === "analyzed" && activeFile.ocr) return;
+
+        void analyzeExisting(activeFile, activeUrl);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [user, activeFile?.fileId, activeUrl]);
 
     const firstName = userProfile?.firstName || user?.displayName?.split(" ")[0] || "User";
 
@@ -163,6 +230,7 @@ export default function DocumentsClient() {
                 contentType: file.type || null,
                 size: file.size,
                 status: "uploaded",
+                category: "Documents",
             });
 
             const formData = new FormData();
@@ -278,6 +346,12 @@ export default function DocumentsClient() {
                         <section className="dashboard-section">
                             <h2 className="section-title">Full report</h2>
 
+                            {busyAnalyze && (
+                                <div className="documents-report-muted" style={{ marginBottom: 12 }}>
+                                    Generating analysis…
+                                </div>
+                            )}
+
                             <div className="documents-report-grid">
                                 <div className="documents-report-card">
                                     <div className="documents-report-title">Details</div>
@@ -285,7 +359,9 @@ export default function DocumentsClient() {
                                         <div className="documents-k">File name</div>
                                         <div className="documents-v">{activeFile.name}</div>
                                         <div className="documents-k">Status</div>
-                                        <div className="documents-v">{activeFile.status}</div>
+                                        <div className="documents-v">
+                                            {busyAnalyze ? "analyzing" : activeFile.status}
+                                        </div>
                                         <div className="documents-k">Language</div>
                                         <div className="documents-v">{activeFile.ocr?.language || "—"}</div>
                                         <div className="documents-k">Accuracy</div>

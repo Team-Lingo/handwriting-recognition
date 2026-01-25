@@ -40,7 +40,7 @@ const sidebarItems: SidebarItem[] = [
 
 const bottomItems: SidebarItem[] = [
     { id: "contact", label: "Contact", icon: <MdEmail />, href: "/contact" },
-    { id: "settings", label: "Settings", icon: <MdSettings />, href: "/profile" },
+    { id: "settings", label: "Settings", icon: <MdSettings />, href: "/settings" },
 ];
 
 export default function DashboardSidebar({ user, userProfile }: DashboardSidebarProps) {
@@ -54,7 +54,7 @@ export default function DashboardSidebar({ user, userProfile }: DashboardSidebar
         if (pathname?.startsWith("/language-detection")) return "language-detection";
         if (pathname?.startsWith("/history")) return "history";
         if (pathname?.startsWith("/contact")) return "contact";
-        if (pathname?.startsWith("/profile")) return "settings";
+        if (pathname?.startsWith("/settings") || pathname?.startsWith("/profile")) return "settings";
         return "dashboard";
     })();
 

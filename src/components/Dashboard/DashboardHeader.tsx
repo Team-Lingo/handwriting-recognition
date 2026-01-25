@@ -5,7 +5,7 @@ interface DashboardHeaderProps {
     userName?: string;
 }
 
-export default function DashboardHeader({ userName = "Abdelrahman" }: DashboardHeaderProps) {
+export default function DashboardHeader({ userName = "User" }: DashboardHeaderProps) {
     return (
         <header className="dashboard-page-header">
             <div className="header-content">

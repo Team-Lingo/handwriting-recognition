@@ -95,9 +95,9 @@ export default function AdminPage() {
                 <div className="flex items-center justify-between px-6 py-4 border-b">
                     <h1 className="text-2xl font-semibold">Admin • Users</h1>
                     <button
-                        onClick={() => router.push("/profile")}
+                        onClick={() => router.push("/settings")}
                         className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-md">
-                        Back to Profile
+                        Back to Settings
                     </button>
                 </div>
 

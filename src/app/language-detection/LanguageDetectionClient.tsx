@@ -7,6 +7,9 @@ import DashboardHeader from "@/components/Dashboard/DashboardHeader";
 import DashboardSidebar from "@/components/Dashboard/DashboardSidebar";
 import { useAuth } from "@/contexts/AuthContext";
 import { MdAutoAwesome, MdLanguage, MdPercent, MdUploadFile } from "react-icons/md";
+import { ref as storageRef, uploadBytes } from "firebase/storage";
+import { storage } from "@/lib/firebase";
+import { setUserFileFailed, upsertUserFileRecord } from "@/services/filesService";
 
 type DetectResponse = {
     language: "English" | "Arabic" | "Unknown";
@@ -31,6 +34,11 @@ export default function LanguageDetectionClient() {
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [result, setResult] = useState<DetectResponse | null>(null);
+
+    const createFileId = () =>
+        globalThis.crypto && "randomUUID" in globalThis.crypto
+            ? globalThis.crypto.randomUUID()
+            : `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
     useEffect(() => {
         if (!loading && !user) {
@@ -60,7 +68,36 @@ export default function LanguageDetectionClient() {
         setError(null);
         setResult(null);
 
+        let createdFileId: string | null = null;
+        let uploaded = false;
+
         try {
+            if (!user) {
+                throw new Error("Please sign in to upload images.");
+            }
+
+            const fileId = createFileId();
+            createdFileId = fileId;
+            const ext = file.name.includes(".") ? `.${file.name.split(".").pop()}` : "";
+            const storagePath = `users/${user.uid}/files/${fileId}${ext}`;
+
+            await uploadBytes(storageRef(storage, storagePath), file, {
+                contentType: file.type,
+                customMetadata: { originalName: file.name },
+            });
+
+            await upsertUserFileRecord(user.uid, fileId, {
+                name: file.name,
+                storagePath,
+                bucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET || "",
+                contentType: file.type || null,
+                size: file.size,
+                status: "uploaded",
+                category: "Language Detection",
+            });
+
+            uploaded = true;
+
             const formData = new FormData();
             formData.append("file", file);
 
@@ -73,7 +110,16 @@ export default function LanguageDetectionClient() {
             const data = (await res.json()) as DetectResponse;
             setResult(data);
         } catch (e) {
-            setError((e as Error).message || "Language detection failed");
+            const message = (e as Error).message || "Language detection failed";
+            setError(message);
+
+            if (!uploaded && user && createdFileId) {
+                try {
+                    await setUserFileFailed(user.uid, createdFileId, message);
+                } catch {
+                    // ignore
+                }
+            }
         } finally {
             setBusy(false);
         }

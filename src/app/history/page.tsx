@@ -1,4 +1,5 @@
 "use client";
+
 import { useEffect, useMemo, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
@@ -9,6 +10,10 @@ import type { UserFileRecord } from "@/types/file";
 import { getDownloadURL, ref } from "firebase/storage";
 import { storage } from "@/lib/firebase";
 import "../dashboard/dashboard.css";
+import "./history.css";
+
+import { MdCheck, MdClose, MdHourglassEmpty, MdInsertDriveFile, MdPictureAsPdf } from "react-icons/md";
+import { FaFileWord } from "react-icons/fa";
 
 function timeAgo(date: Date): string {
     const seconds = Math.floor((Date.now() - date.getTime()) / 1000);
@@ -25,10 +30,13 @@ export default function HistoryPage() {
     const { user, userProfile, loading } = useAuth();
     const router = useRouter();
     const pathname = usePathname();
+
     const [files, setFiles] = useState<UserFileRecord[]>([]);
     const [urls, setUrls] = useState<Record<string, string>>({});
     const [busy, setBusy] = useState(false);
-    const [viewing, setViewing] = useState<UserFileRecord | null>(null);
+    const [page, setPage] = useState(1);
+
+    const pageSize = 10;
 
     useEffect(() => {
         if (!loading && !user) {
@@ -36,37 +44,84 @@ export default function HistoryPage() {
         }
     }, [user, loading, router, pathname]);
 
-    const load = async () => {
-        if (!user) return;
-        setBusy(true);
-        try {
-            const items = await listUserFiles(user.uid, 100);
-            setFiles(items);
-
-            const entries = await Promise.all(
-                items.map(async (item) => {
-                    try {
-                        const u = await getDownloadURL(ref(storage, item.storagePath));
-                        return [item.fileId, u] as const;
-                    } catch {
-                        return [item.fileId, ""] as const;
-                    }
-                }),
-            );
-            const map: Record<string, string> = {};
-            for (const [k, v] of entries) map[k] = v;
-            setUrls(map);
-        } finally {
-            setBusy(false);
-        }
-    };
-
     useEffect(() => {
+        const load = async () => {
+            if (!user) return;
+            setBusy(true);
+            try {
+                const items = await listUserFiles(user.uid, 100);
+                setFiles(items);
+
+                const entries = await Promise.all(
+                    items.map(async (item) => {
+                        try {
+                            const u = await getDownloadURL(ref(storage, item.storagePath));
+                            return [item.fileId, u] as const;
+                        } catch {
+                            return [item.fileId, ""] as const;
+                        }
+                    }),
+                );
+
+                const map: Record<string, string> = {};
+                for (const [k, v] of entries) map[k] = v;
+                setUrls(map);
+            } finally {
+                setBusy(false);
+            }
+        };
+
         void load();
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [user]);
 
-    const hasFiles = useMemo(() => files && files.length > 0, [files]);
+    const hasFiles = files.length > 0;
+    const totalPages = useMemo(() => Math.max(1, Math.ceil(files.length / pageSize)), [files.length]);
+    const currentPage = Math.min(page, totalPages);
+    const pageItems = useMemo(() => {
+        const start = (currentPage - 1) * pageSize;
+        return files.slice(start, start + pageSize);
+    }, [files, currentPage]);
+
+    useEffect(() => {
+        setPage(1);
+    }, [files.length]);
+
+    const statusLabel = (f: UserFileRecord) => {
+        if (f.status === "analyzed") return "Completed";
+        if (f.status === "failed") return "Failed";
+        return "In Progress";
+    };
+
+    const categoryLabel = (f: UserFileRecord) => {
+        if (f.category) return f.category;
+        if (f.ocr) return "OCR";
+        return "Document";
+    };
+
+    const FileThumb = ({ f }: { f: UserFileRecord }) => {
+        const url = urls[f.fileId];
+        const isImage = Boolean(url) && (f.contentType || "").startsWith("image/");
+        const name = (f.name || "").toLowerCase();
+
+        if (isImage) {
+            return (
+                <div className="history-thumb">
+                    <img src={url} alt={f.name} />
+                </div>
+            );
+        }
+
+        const icon =
+            name.endsWith(".pdf") || (f.contentType || "").includes("pdf") ? (
+                <MdPictureAsPdf size={22} />
+            ) : name.endsWith(".doc") || name.endsWith(".docx") ? (
+                <FaFileWord size={20} />
+            ) : (
+                <MdInsertDriveFile size={22} />
+            );
+
+        return <div className="history-thumb">{icon}</div>;
+    };
 
     if (loading || !user) {
         return (
@@ -81,12 +136,6 @@ export default function HistoryPage() {
 
     const firstName = userProfile?.firstName || user.displayName?.split(" ")[0] || "User";
 
-    const viewingUrl = viewing ? urls[viewing.fileId] : "";
-    const viewingCreatedAt = viewing?.createdAt?.toDate?.() || null;
-    const viewingAnalyzedAt = viewing?.analyzedAt?.toDate?.() || null;
-    const viewingText = viewing?.ocr?.correctedText || viewing?.ocr?.text || "";
-    const viewingNotes = viewing?.ocr?.notes || [];
-
     return (
         <div className="dashboard-layout">
             <DashboardSidebar user={user} userProfile={userProfile} />
@@ -95,9 +144,13 @@ export default function HistoryPage() {
                     <DashboardHeader userName={firstName} />
 
                     <section className="dashboard-section">
-                        <div
-                            style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
-                            <h2 className="section-title">History</h2>
+                        <div className="history-header">
+                            <div>
+                                <h2 className="section-title">Document History</h2>
+                                <p className="history-subtitle">
+                                    View all your uploaded handwriting files and their current status
+                                </p>
+                            </div>
                         </div>
 
                         {!hasFiles && (
@@ -111,193 +164,128 @@ export default function HistoryPage() {
                         )}
 
                         {hasFiles && (
-                            <div
-                                className="files-grid"
-                                style={{
-                                    display: "grid",
-                                    gap: 16,
-                                    gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))",
-                                }}>
-                                {files.map((f) => {
-                                    const href = urls[f.fileId];
-                                    const createdAt = f.createdAt?.toDate?.() || null;
-                                    const createdStr = createdAt
-                                        ? `${createdAt.toLocaleString()} (${timeAgo(createdAt)})`
-                                        : "";
-                                    const sizeKb = f.size ? Math.round((f.size / 1024) * 10) / 10 : null;
+                            <>
+                                <div className="history-table-card">
+                                    <table className="history-table">
+                                        <thead>
+                                            <tr>
+                                                <th>File Name</th>
+                                                <th>Data Uploaded</th>
+                                                <th>Category</th>
+                                                <th>Status</th>
+                                                <th style={{ textAlign: "right" }}>Action</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {pageItems.map((f) => {
+                                                const createdAt = f.createdAt?.toDate?.() || null;
+                                                const createdStr = createdAt
+                                                    ? `${createdAt.toLocaleDateString()} (${timeAgo(createdAt)})`
+                                                    : "—";
 
-                                    return (
-                                        <div key={f.fileId} className="card" style={{ padding: 12 }}>
-                                            <div
-                                                style={{
-                                                    height: 160,
-                                                    display: "flex",
-                                                    alignItems: "center",
-                                                    justifyContent: "center",
-                                                    background: "#f8f8f8",
-                                                }}>
-                                                {href && (f.contentType || "").startsWith("image/") ? (
-                                                    <img
-                                                        src={href}
-                                                        alt={f.name}
-                                                        style={{
-                                                            maxWidth: "100%",
-                                                            maxHeight: "100%",
-                                                            objectFit: "contain",
-                                                        }}
-                                                    />
-                                                ) : (
-                                                    <div style={{ color: "#888", fontWeight: 600 }}>
-                                                        {(f.contentType || "").includes("pdf")
-                                                            ? "PDF"
-                                                            : f.name.toLowerCase().endsWith(".pptx")
-                                                              ? "PPTX"
-                                                              : "File"}
-                                                    </div>
-                                                )}
-                                            </div>
+                                                const status = statusLabel(f);
+                                                const statusDot =
+                                                    f.status === "analyzed"
+                                                        ? "history-status-dot--ok"
+                                                        : f.status === "failed"
+                                                          ? "history-status-dot--fail"
+                                                          : "history-status-dot--progress";
+                                                const statusIcon =
+                                                    f.status === "analyzed" ? (
+                                                        <MdCheck size={14} />
+                                                    ) : f.status === "failed" ? (
+                                                        <MdClose size={14} />
+                                                    ) : (
+                                                        <MdHourglassEmpty size={14} />
+                                                    );
 
-                                            <div style={{ marginTop: 8 }}>
-                                                <div
-                                                    title={f.name}
-                                                    style={{
-                                                        fontWeight: 600,
-                                                        overflow: "hidden",
-                                                        textOverflow: "ellipsis",
-                                                        whiteSpace: "nowrap",
-                                                    }}>
-                                                    {f.name}
-                                                </div>
-                                                <div style={{ fontSize: 12, color: "#666" }}>
-                                                    {f.contentType || ""}
-                                                    {sizeKb ? ` • ${sizeKb} KB` : ""}
-                                                </div>
-                                                <div style={{ fontSize: 12, color: "#666" }}>{createdStr}</div>
-                                                <div style={{ fontSize: 12, color: "#666", marginTop: 4 }}>
-                                                    Status: {f.status}
-                                                    {f.ocr?.language ? ` • ${f.ocr.language}` : ""}
-                                                    {typeof f.ocr?.accuracy === "number" ? ` • ${f.ocr.accuracy}%` : ""}
-                                                </div>
-                                            </div>
+                                                return (
+                                                    <tr key={f.fileId}>
+                                                        <td>
+                                                            <div className="history-filecell">
+                                                                <FileThumb f={f} />
+                                                                <div style={{ minWidth: 0 }}>
+                                                                    <div className="history-filename" title={f.name}>
+                                                                        {f.name}
+                                                                    </div>
+                                                                    <div className="history-meta">
+                                                                        {(f.contentType || "").toUpperCase()}
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        </td>
+                                                        <td>{createdStr}</td>
+                                                        <td>
+                                                            <span className="history-tag">{categoryLabel(f)}</span>
+                                                        </td>
+                                                        <td>
+                                                            <span className="history-status">
+                                                                <span className={`history-status-dot ${statusDot}`}>
+                                                                    {statusIcon}
+                                                                </span>
+                                                                {status}
+                                                            </span>
+                                                        </td>
+                                                        <td>
+                                                            <div className="history-actions">
+                                                                <button
+                                                                    type="button"
+                                                                    className="btn btn-primary"
+                                                                    onClick={() =>
+                                                                        router.push(
+                                                                            `/documents?fileId=${encodeURIComponent(f.fileId)}`,
+                                                                        )
+                                                                    }>
+                                                                    View
+                                                                </button>
+                                                            </div>
+                                                        </td>
+                                                    </tr>
+                                                );
+                                            })}
+                                        </tbody>
+                                    </table>
+                                </div>
 
-                                            <div style={{ marginTop: 8, display: "flex", gap: 8, flexWrap: "wrap" }}>
-                                                <button className="btn btn-primary" onClick={() => setViewing(f)}>
-                                                    View
-                                                </button>
-                                            </div>
-                                        </div>
-                                    );
-                                })}
-                            </div>
+                                <div className="history-pagination">
+                                    <div className="history-pageinfo">
+                                        Showing {(currentPage - 1) * pageSize + 1}–
+                                        {Math.min(currentPage * pageSize, files.length)} of {files.length}
+                                    </div>
+                                    <div className="history-pagebuttons">
+                                        <button
+                                            type="button"
+                                            className="history-pagebtn"
+                                            disabled={currentPage <= 1}
+                                            onClick={() => setPage((p) => Math.max(1, p - 1))}>
+                                            Prev
+                                        </button>
+                                        {Array.from({ length: totalPages })
+                                            .slice(0, 7)
+                                            .map((_, idx) => {
+                                                const p = idx + 1;
+                                                return (
+                                                    <button
+                                                        key={p}
+                                                        type="button"
+                                                        className={`history-pagebtn ${p === currentPage ? "history-pagebtn--active" : ""}`}
+                                                        onClick={() => setPage(p)}>
+                                                        {p}
+                                                    </button>
+                                                );
+                                            })}
+                                        <button
+                                            type="button"
+                                            className="history-pagebtn"
+                                            disabled={currentPage >= totalPages}
+                                            onClick={() => setPage((p) => Math.min(totalPages, p + 1))}>
+                                            Next
+                                        </button>
+                                    </div>
+                                </div>
+                            </>
                         )}
                     </section>
-
-                    {viewing && (
-                        <div
-                            role="dialog"
-                            aria-modal="true"
-                            onClick={() => setViewing(null)}
-                            style={{
-                                position: "fixed",
-                                inset: 0,
-                                background: "rgba(0, 0, 0, 0.5)",
-                                display: "flex",
-                                alignItems: "center",
-                                justifyContent: "center",
-                                padding: 16,
-                                zIndex: 50,
-                            }}>
-                            <div
-                                className="card"
-                                onClick={(e) => e.stopPropagation()}
-                                style={{ width: "min(920px, 100%)", maxHeight: "90vh", overflow: "auto" }}>
-                                <div
-                                    style={{
-                                        display: "flex",
-                                        justifyContent: "space-between",
-                                        alignItems: "center",
-                                        gap: 12,
-                                    }}>
-                                    <div style={{ minWidth: 0 }}>
-                                        <div
-                                            style={{
-                                                fontWeight: 700,
-                                                fontSize: 16,
-                                                overflow: "hidden",
-                                                textOverflow: "ellipsis",
-                                            }}>
-                                            {viewing.name}
-                                        </div>
-                                        <div style={{ fontSize: 12, color: "#666" }}>
-                                            Status: {viewing.status}
-                                            {viewing.ocr?.language ? ` • ${viewing.ocr.language}` : ""}
-                                            {typeof viewing.ocr?.accuracy === "number"
-                                                ? ` • ${viewing.ocr.accuracy}%`
-                                                : ""}
-                                        </div>
-                                        <div style={{ fontSize: 12, color: "#666" }}>
-                                            {viewingCreatedAt ? `Uploaded: ${viewingCreatedAt.toLocaleString()}` : ""}
-                                            {viewingAnalyzedAt
-                                                ? ` • Analyzed: ${viewingAnalyzedAt.toLocaleString()}`
-                                                : ""}
-                                        </div>
-                                    </div>
-
-                                    <button className="btn" onClick={() => setViewing(null)}>
-                                        Close
-                                    </button>
-                                </div>
-
-                                <div style={{ display: "grid", gap: 12, marginTop: 12 }}>
-                                    {viewingUrl && (viewing.contentType || "").startsWith("image/") && (
-                                        <div
-                                            style={{
-                                                height: 260,
-                                                display: "flex",
-                                                alignItems: "center",
-                                                justifyContent: "center",
-                                                background: "#f8f8f8",
-                                            }}>
-                                            <img
-                                                src={viewingUrl}
-                                                alt={viewing.name}
-                                                style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain" }}
-                                            />
-                                        </div>
-                                    )}
-
-                                    {viewing.status === "failed" && viewing.errorMessage && (
-                                        <div
-                                            className="card"
-                                            style={{ background: "#fff5f5", border: "1px solid #ffd1d1" }}>
-                                            <div style={{ fontWeight: 700, marginBottom: 6 }}>Error</div>
-                                            <div style={{ whiteSpace: "pre-wrap" }}>{viewing.errorMessage}</div>
-                                        </div>
-                                    )}
-
-                                    <div className="card" style={{ background: "#fafafa" }}>
-                                        <div style={{ fontWeight: 700, marginBottom: 6 }}>Extracted Text</div>
-                                        <div style={{ whiteSpace: "pre-wrap" }}>
-                                            {viewingText || "No extracted text saved for this document."}
-                                        </div>
-                                    </div>
-
-                                    {viewingNotes.length > 0 && (
-                                        <div className="card" style={{ background: "#fafafa" }}>
-                                            <div style={{ fontWeight: 700, marginBottom: 6 }}>Notes</div>
-                                            <ul style={{ margin: 0, paddingLeft: 18 }}>
-                                                {viewingNotes.map((n, idx) => (
-                                                    <li key={idx} style={{ marginBottom: 4 }}>
-                                                        {n}
-                                                    </li>
-                                                ))}
-                                            </ul>
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
-                        </div>
-                    )}
                 </div>
             </main>
         </div>

@@ -8,6 +8,7 @@ export interface UserFileRecord {
     bucket: string;
     contentType: string | null;
     size: number | null;
+    category?: string | null;
     md5Hash?: string | null;
     crc32c?: string | null;
     timeCreated?: string | null;
