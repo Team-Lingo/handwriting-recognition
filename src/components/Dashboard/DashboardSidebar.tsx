@@ -54,7 +54,7 @@ export default function DashboardSidebar({ user, userProfile }: DashboardSidebar
         if (pathname?.startsWith("/language-detection")) return "language-detection";
         if (pathname?.startsWith("/history")) return "history";
         if (pathname?.startsWith("/contact")) return "contact";
-        if (pathname?.startsWith("/settings") || pathname?.startsWith("/profile")) return "settings";
+        if (pathname?.startsWith("/settings")) return "settings";
         return "dashboard";
     })();
 
