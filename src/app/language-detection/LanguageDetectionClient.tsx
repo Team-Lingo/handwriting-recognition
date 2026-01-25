@@ -10,6 +10,7 @@ import { MdAutoAwesome, MdLanguage, MdPercent, MdUploadFile } from "react-icons/
 import { ref as storageRef, uploadBytes } from "firebase/storage";
 import { storage } from "@/lib/firebase";
 import { setUserFileFailed, upsertUserFileRecord } from "@/services/filesService";
+import { serverTimestamp } from "firebase/firestore";
 
 type DetectResponse = {
     language: "English" | "Arabic" | "Unknown";
@@ -69,7 +70,6 @@ export default function LanguageDetectionClient() {
         setResult(null);
 
         let createdFileId: string | null = null;
-        let uploaded = false;
 
         try {
             if (!user) {
@@ -96,8 +96,6 @@ export default function LanguageDetectionClient() {
                 category: "Language Detection",
             });
 
-            uploaded = true;
-
             const formData = new FormData();
             formData.append("file", file);
 
@@ -109,11 +107,15 @@ export default function LanguageDetectionClient() {
 
             const data = (await res.json()) as DetectResponse;
             setResult(data);
+            await upsertUserFileRecord(user.uid, fileId, {
+                status: "analyzed",
+                analyzedAt: serverTimestamp(),
+                ocrLanguage: data.language,
+            });
         } catch (e) {
             const message = (e as Error).message || "Language detection failed";
             setError(message);
-
-            if (!uploaded && user && createdFileId) {
+            if (user && createdFileId) {
                 try {
                     await setUserFileFailed(user.uid, createdFileId, message);
                 } catch {

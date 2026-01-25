@@ -6,8 +6,7 @@
 }
 
 .history-subtitle {
-    margin: 6px 0 0;
-    color: #3f6fb6;
+    margin-bottom: 18px;
     font-weight: 600;
 }
 
@@ -109,7 +108,7 @@
     align-items: center;
     gap: 8px;
     font-weight: 700;
-    color: #102a43;
+    color: var(--Main-Text);
 }
 
 .history-status-dot {
@@ -179,8 +178,8 @@
 }
 
 .history-pagebtn--active {
-    background: #1d4ed8;
-    border-color: #1d4ed8;
+    background: var(--Primary-Blue);
+    border-color: var(--Primary-Blue);
     color: #ffffff;
 }
 
