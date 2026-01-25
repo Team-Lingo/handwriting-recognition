@@ -46,6 +46,54 @@ h6 {
 .container {
     max-width: 1280px;
     margin: 0 auto;
+    padding: 0 24px;
+}
+
+/* Shared CTA buttons (used by landing + navbar across marketing pages) */
+.btn-primary-solid,
+.btn-primary-rounded,
+.btn-secondary-outline {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    padding: 14px 28px;
+    border-radius: 999px;
+    text-decoration: none;
+    font-size: 16px;
+    font-weight: 600;
+    transition: var(--transition);
+    white-space: nowrap;
+}
+
+.btn-secondary-outline {
+    border: 2px solid var(--Primary-Dark);
+    background: transparent;
+    color: var(--Primary-Dark);
+}
+
+.btn-primary-solid,
+.btn-primary-rounded {
+    border: 2px solid var(--Primary-Blue);
+    background: var(--Primary-Blue);
+    color: white;
+}
+
+.btn-primary-rounded {
+    padding: 12px 20px;
+    font-size: 15px;
+}
+
+.btn-secondary-outline:hover {
+    background: var(--Primary-Dark);
+    border-color: var(--Primary-Dark);
+    color: white;
+}
+
+.btn-primary-solid:hover,
+.btn-primary-rounded:hover {
+    background: white;
+    color: var(--Primary-Blue);
 }
 
 /* Auth Pages */

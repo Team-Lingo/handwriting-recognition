@@ -1,11 +1,23 @@
 "use client";
-import ComingSoon from "@/components/ComingSoon/ComingSoon";
+import React from "react";
+import Navbar from "@/components/Navbar/Navbar";
+import Hero from "@/components/Hero/Hero";
+import IntroSection from "@/components/Intro/Intro";
+import Stats from "@/components/Stats/Stats";
+import Features from "@/components/Features/Features";
+import Contact from "@/components/Contact/Contact";
+import Footer from "@/components/Footer/Footer";
 
 export default function HomePage() {
-
     return (
         <>
-            <ComingSoon />
+            <Navbar />
+            <Hero />
+            <IntroSection />
+            <Stats />
+            <Features />
+            <Contact />
+            <Footer />
         </>
     );
 }

@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { ProfileForm } from "@/components/ProfileForm";
 import { ProfileView } from "@/components/ProfileView";
 import { ProfileService } from "@/services/profileService";
@@ -13,8 +13,9 @@ import { doc, updateDoc, deleteField } from "firebase/firestore";
 
 export default function ProfilePage() {
     // Hooks for authentication, routing and state management
-    const { user, userProfile, refreshUserProfile } = useAuth();
+    const { user, userProfile, refreshUserProfile, loading } = useAuth();
     const router = useRouter();
+    const pathname = usePathname();
     const [isEditing, setIsEditing] = useState(false);
 
     // Form state management
@@ -30,9 +31,18 @@ export default function ProfilePage() {
     const fileInputRef = useRef<HTMLInputElement | null>(null);
 
     // Redirect if not authenticated
-    if (!user || !userProfile) {
-        router.push("/login");
-        return null;
+    useEffect(() => {
+        if (!loading && (!user || !userProfile)) {
+            router.push(`/auth?next=${encodeURIComponent(pathname || "/profile")}`);
+        }
+    }, [loading, user, userProfile, router, pathname]);
+
+    if (loading || !user || !userProfile) {
+        return (
+            <main className="dashboard-container">
+                <div className="loading">Loading...</div>
+            </main>
+        );
     }
 
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -95,7 +105,7 @@ export default function ProfilePage() {
                             resolve(newFile);
                         },
                         "image/jpeg",
-                        0.85
+                        0.85,
                     );
                 };
 
@@ -119,7 +129,7 @@ export default function ProfilePage() {
                         setUploadProgress(Math.round(prog));
                     },
                     (error) => reject(error),
-                    () => resolve()
+                    () => resolve(),
                 );
             });
 
@@ -256,8 +266,8 @@ export default function ProfilePage() {
                                     pid === "google.com"
                                         ? "Google"
                                         : pid === "github.com"
-                                        ? "GitHub"
-                                        : "your identity provider";
+                                          ? "GitHub"
+                                          : "your identity provider";
                                 return (
                                     <div className="text-yellow-600 text-sm mt-4">
                                         You cannot change your password because you signed up with {providerName}.
@@ -371,9 +381,8 @@ export default function ProfilePage() {
                                         className="px-3 py-1 text-sm rounded-md bg-blue-600 text-white hover:bg-blue-700"
                                         onClick={async () => {
                                             try {
-                                                const { GoogleAuthProvider, linkWithPopup } = await import(
-                                                    "firebase/auth"
-                                                );
+                                                const { GoogleAuthProvider, linkWithPopup } =
+                                                    await import("firebase/auth");
                                                 const provider = new GoogleAuthProvider();
                                                 await linkWithPopup(user, provider);
                                                 await user.reload();
@@ -383,7 +392,7 @@ export default function ProfilePage() {
                                                 // Surface guidance if account exists with different credential
                                                 if (error?.code === "auth/account-exists-with-different-credential") {
                                                     alert(
-                                                        "This email is already used by another provider. Sign in with that provider first, then link Google."
+                                                        "This email is already used by another provider. Sign in with that provider first, then link Google.",
                                                     );
                                                 } else {
                                                     alert(error?.message || "Failed to link Google.");
@@ -430,9 +439,8 @@ export default function ProfilePage() {
                                         className="px-3 py-1 text-sm rounded-md bg-blue-600 text-white hover:bg-blue-700"
                                         onClick={async () => {
                                             try {
-                                                const { GithubAuthProvider, linkWithPopup } = await import(
-                                                    "firebase/auth"
-                                                );
+                                                const { GithubAuthProvider, linkWithPopup } =
+                                                    await import("firebase/auth");
                                                 const provider = new GithubAuthProvider();
                                                 provider.addScope("user:email");
                                                 await linkWithPopup(user, provider);
@@ -442,7 +450,7 @@ export default function ProfilePage() {
                                                 const error = err as { code?: string; message?: string };
                                                 if (error?.code === "auth/account-exists-with-different-credential") {
                                                     alert(
-                                                        "This email is already used by another provider. Sign in with that provider first, then link GitHub."
+                                                        "This email is already used by another provider. Sign in with that provider first, then link GitHub.",
                                                     );
                                                 } else {
                                                     alert(error?.message || "Failed to link GitHub.");

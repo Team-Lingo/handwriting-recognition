@@ -3,43 +3,44 @@ rules_version='2'
 service cloud.firestore {
   match /databases/{database}/documents {
     function isSignedIn() { return request.auth != null; }
+    function isOwner(userId) { return isSignedIn() && request.auth.uid == userId; }
     function isAdmin() {
       return isSignedIn() &&
         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'Admin';
     }
 
-    // Ensure non-admins cannot set or change role to escalate privileges
     function ownerKeepsSameRole() {
-      // If the role field exists, it must not change for non-admin updates
       return request.resource.data.role == resource.data.role;
     }
     function roleIsNotAdminOnCreate() {
-      // On create by a non-admin, role must be absent or explicitly 'User'
       return !("role" in request.resource.data) || request.resource.data.role == 'User';
     }
 
-    // Users can manage their own profile. Admins can read all users.
     match /users/{userId} {
-      // Create: owner can create their own doc; non-admins cannot grant themselves Admin
-      // Admins may create any user doc if needed
       allow create: if isSignedIn() && (
         (request.auth.uid == userId && roleIsNotAdminOnCreate()) || isAdmin()
       );
 
-      // Read: owner or admin
       allow read: if isSignedIn() && (request.auth.uid == userId || isAdmin());
-
-      // Update:
-      // - Owner can update their own doc only if the role does not change
-      // - Admin can update any doc (including changing role)
       allow update: if isSignedIn() && (
-        (request.auth.uid == userId && ownerKeepsSameRole()) || isAdmin()
+        (
+          isOwner(userId) &&
+          ownerKeepsSameRole() &&
+          request.resource.data.diff(resource.data).changedKeys().hasOnly([
+            'firstName',
+            'lastName',
+            'email',
+            'profilePictureUrl',
+            'profilePicturePath',
+            'createdAt',
+            'ocrStats',
+            'ocrStatsUpdatedAt'
+          ])
+        )
+        || isAdmin()
       );
 
-      // Delete: owner or admin
       allow delete: if isSignedIn() && (request.auth.uid == userId || isAdmin());
-
-      // Files subcollection under each user
       match /files/{fileId} {
         allow read, write: if request.auth != null && request.auth.uid == userId;
       }

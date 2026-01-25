@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { collection, getDocs, doc, updateDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
@@ -14,6 +14,7 @@ interface UserRow extends UserProfile {
 
 export default function AdminPage() {
     const router = useRouter();
+    const pathname = usePathname();
     const { user, userProfile, loading } = useAuth();
     const [users, setUsers] = useState<UserRow[]>([]);
     const [fetching, setFetching] = useState(false);
@@ -25,7 +26,7 @@ export default function AdminPage() {
         if (loading) return;
 
         if (!user) {
-            router.replace("/login");
+            router.replace(`/auth?next=${encodeURIComponent(pathname || "/admin")}`);
             return;
         }
 
@@ -59,7 +60,7 @@ export default function AdminPage() {
         };
 
         run();
-    }, [loading, user, isAdmin, router]);
+    }, [loading, user, isAdmin, router, pathname]);
 
     if (loading) {
         return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
@@ -80,8 +81,8 @@ export default function AdminPage() {
                 err instanceof FirebaseError
                     ? err.message
                     : err instanceof Error
-                    ? err.message
-                    : "Failed to update role";
+                      ? err.message
+                      : "Failed to update role";
             alert(message);
         } finally {
             setUpdating((m) => ({ ...m, [targetUser.id]: false }));
@@ -181,8 +182,8 @@ export default function AdminPage() {
                                                     {busy
                                                         ? "Updating…"
                                                         : targetRole === "Admin"
-                                                        ? "Make Admin"
-                                                        : "Make User"}
+                                                          ? "Make Admin"
+                                                          : "Make User"}
                                                 </button>
                                             </td>
                                         </tr>

@@ -2,19 +2,8 @@
 import { useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import {
-    MdDashboard,
-    MdDescription,
-    MdLanguage,
-    MdAutoAwesome,
-    MdHistory,
-    MdEmail,
-    MdHelp,
-    MdSettings,
-    MdExpandMore,
-    MdExpandLess,
-    MdLogout,
-} from "react-icons/md";
+import { usePathname } from "next/navigation";
+import { MdDashboard, MdHistory, MdEmail, MdSettings, MdExpandMore, MdExpandLess, MdLogout } from "react-icons/md";
 import { User } from "firebase/auth";
 import { UserProfile } from "@/types/profile";
 import { useAuth } from "@/contexts/AuthContext";
@@ -33,23 +22,27 @@ interface SidebarItem {
 }
 
 const sidebarItems: SidebarItem[] = [
-    { id: "dashboard", label: "Dashboard", icon: <MdDashboard />, href: "/dashboard-new" },
-    { id: "documents", label: "Documents", icon: <MdDescription />, href: "/dashboard-new?tab=documents" },
-    { id: "language", label: "Language Detection", icon: <MdLanguage />, href: "/dashboard-new?tab=language" },
-    { id: "ai", label: "AI Analysis", icon: <MdAutoAwesome />, href: "/dashboard-new?tab=ai" },
-    { id: "history", label: "History", icon: <MdHistory />, href: "/files" },
+    { id: "dashboard", label: "Dashboard", icon: <MdDashboard />, href: "/dashboard" },
+    { id: "history", label: "History", icon: <MdHistory />, href: "/history" },
 ];
 
 const bottomItems: SidebarItem[] = [
     { id: "contact", label: "Contact", icon: <MdEmail />, href: "/contact" },
-    { id: "help", label: "Help", icon: <MdHelp />, href: "/dashboard-new?tab=help" },
     { id: "settings", label: "Settings", icon: <MdSettings />, href: "/profile" },
 ];
 
 export default function DashboardSidebar({ user, userProfile }: DashboardSidebarProps) {
     const { signOut } = useAuth();
+    const pathname = usePathname();
     const [activeId, setActiveId] = useState("dashboard");
     const [isMenuOpen, setIsMenuOpen] = useState(false);
+
+    const derivedActiveId = (() => {
+        if (pathname?.startsWith("/history")) return "history";
+        if (pathname?.startsWith("/contact")) return "contact";
+        if (pathname?.startsWith("/profile")) return "settings";
+        return "dashboard";
+    })();
 
     const handleLogout = async () => {
         try {
@@ -91,7 +84,7 @@ export default function DashboardSidebar({ user, userProfile }: DashboardSidebar
                         <Link
                             key={item.id}
                             href={item.href}
-                            className={`sidebar-item ${activeId === item.id ? "active" : ""}`}
+                            className={`sidebar-item ${(derivedActiveId || activeId) === item.id ? "active" : ""}`}
                             onClick={() => setActiveId(item.id)}>
                             <span className="sidebar-icon">{item.icon}</span>
                             <span className="sidebar-label">{item.label}</span>
@@ -106,7 +99,7 @@ export default function DashboardSidebar({ user, userProfile }: DashboardSidebar
                         <Link
                             key={item.id}
                             href={item.href}
-                            className={`sidebar-item ${activeId === item.id ? "active" : ""}`}
+                            className={`sidebar-item ${(derivedActiveId || activeId) === item.id ? "active" : ""}`}
                             onClick={() => setActiveId(item.id)}
                             style={{ animationDelay: `${index * 50}ms` }}>
                             <span className="sidebar-icon">{item.icon}</span>

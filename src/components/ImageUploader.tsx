@@ -66,8 +66,8 @@ export default function ImageUploader() {
                 <p style={{ marginTop: "0.5rem" }}>
                     {message}{" "}
                     {message.includes("success") && (
-                        <a href="/files" style={{ color: "#0070f3", textDecoration: "underline" }}>
-                            Click here to view it in files
+                        <a href="/history" style={{ color: "#0070f3", textDecoration: "underline" }}>
+                            Click here to view it in history
                         </a>
                     )}
                 </p>

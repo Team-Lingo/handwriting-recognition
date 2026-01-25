@@ -1,4 +1,5 @@
 import { Timestamp } from "firebase/firestore";
+import type { OcrResponse } from "@/types/ocr";
 
 export interface UserFileRecord {
     fileId: string;
@@ -13,4 +14,9 @@ export interface UserFileRecord {
     updated?: string | null;
     status: "uploaded" | "analyzed" | "failed";
     createdAt?: Timestamp;
+    analyzedAt?: Timestamp;
+    ocr?: OcrResponse;
+    ocrLanguage?: string | null;
+    ocrAccuracy?: number | null;
+    errorMessage?: string | null;
 }

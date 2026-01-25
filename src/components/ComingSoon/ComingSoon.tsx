@@ -4,26 +4,24 @@ import "./ComingSoon.css";
 import { useRouter } from "next/navigation";
 
 export default function ComingSoon() {
-  const router = useRouter();
+    const router = useRouter();
 
-  const handleGoHome = () => {
-    console.log("Go home button clicked");
-    router.push("/dashboard");
-  };
+    const handleGoHome = () => {
+        console.log("Go home button clicked");
+        router.push("/");
+    };
 
-  return (
-    <section className="Container">
-      <span className="Badge">🚧 Coming Soon</span>
-      <h1 className={`landing-title Title`}>
-        This feature is under construction
-      </h1>
-      <p className="Subtitle">
-        We&apos;re working hard to bring this to you. In the meantime, you can
-        use the existing features or return to the dashboard.
-      </p>
-      <button className="Cta" onClick={handleGoHome}>
-        Go home
-      </button>
-    </section>
-  );
+    return (
+        <section className="Container">
+            <span className="Badge">🚧 Coming Soon</span>
+            <h1 className={`landing-title Title`}>This feature is under construction</h1>
+            <p className="Subtitle">
+                We&apos;re working hard to bring this to you. In the meantime, you can use the existing features or
+                return to the dashboard.
+            </p>
+            <button className="Cta" onClick={handleGoHome}>
+                Go home
+            </button>
+        </section>
+    );
 }

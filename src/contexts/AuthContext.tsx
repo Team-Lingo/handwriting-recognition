@@ -26,6 +26,13 @@ interface UserProfile {
     role?: "Admin" | "User" | string;
     profilePictureUrl?: string;
     profilePicturePath?: string;
+    ocrStats?: {
+        analyzedCount: number;
+        accuracyCount: number;
+        accuracySum: number;
+        avgAccuracy: number | null;
+        languages: Record<string, number>;
+    };
 }
 
 interface AuthContextType {
@@ -126,7 +133,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         const actionCodeSettings = origin
             ? {
-                  url: `${origin}/login`,
+                  url: `${origin}/auth?reset=true`,
                   handleCodeInApp: false,
               }
             : undefined;
@@ -185,11 +192,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                         return; // linked and signed in
                     } else if (methods.includes("password")) {
                         throw new Error(
-                            "An account already exists with this email using a password. Please sign in with email/password first, then link Google from your profile."
+                            "An account already exists with this email using a password. Please sign in with email/password first, then link Google from your profile.",
                         );
                     } else if (methods.length) {
                         throw new Error(
-                            `An account already exists with this email using ${methods[0]}. Sign in with that provider first, then link Google from your profile.`
+                            `An account already exists with this email using ${methods[0]}. Sign in with that provider first, then link Google from your profile.`,
                         );
                     }
                 }
@@ -265,11 +272,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                         return; // linked and signed in
                     } else if (methods.includes("password")) {
                         throw new Error(
-                            "An account already exists with this email using a password. Please sign in with email/password first, then link GitHub from your profile."
+                            "An account already exists with this email using a password. Please sign in with email/password first, then link GitHub from your profile.",
                         );
                     } else if (methods.length) {
                         throw new Error(
-                            `An account already exists with this email using ${methods[0]}. Sign in with that provider first, then link GitHub from your profile.`
+                            `An account already exists with this email using ${methods[0]}. Sign in with that provider first, then link GitHub from your profile.`,
                         );
                     }
                 }
