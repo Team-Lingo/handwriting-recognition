@@ -13,7 +13,7 @@ import { setUserFileFailed, upsertUserFileRecord } from "@/services/filesService
 import { serverTimestamp } from "firebase/firestore";
 
 type DetectResponse = {
-    language: "English" | "Arabic" | "Unknown";
+    language: "English" | "Arabic" | "Arabic and English" | "Unknown";
     hasText: boolean;
 };
 
