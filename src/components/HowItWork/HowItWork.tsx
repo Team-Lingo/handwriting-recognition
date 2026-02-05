@@ -14,7 +14,7 @@ const HowItWork = () => {
       description: 'Our advanced AI analyzes the handwriting, recognizing characters and words with high accuracy.'
     },
     {
-      number: '01',
+      number: '03',
       title: 'Receive Digital Text',
       description: 'Instantly receive a digital version of your handwritten text, ready for editing or sharing.'
     }

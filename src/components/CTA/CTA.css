@@ -1,6 +1,6 @@
 .CTA {
-  min-height: 100vh;
-background-color: var(--Primary-Dark);
+  min-height: 50vh;
+  background-color: var(--Primary-Dark);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -44,6 +44,7 @@ background-color: var(--Primary-Dark);
   font-weight: 500;
   cursor: pointer;
   transition: all 0.3s ease;
+  text-decoration: none;
 }
 
 .cta-btn:hover {

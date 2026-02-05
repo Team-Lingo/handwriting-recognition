@@ -1,5 +1,5 @@
 import "./CTA.css"
-export default function CTASection() {
+export default function CTA() {
   return (
     <section className="CTA">
       <div className="CTA-content">
@@ -14,7 +14,7 @@ export default function CTASection() {
           recognition
         </p>
 
-        <button className="cta-btn">Start Free Trial</button>
+        <a href="/auth" className="cta-btn">Start Free Trial</a>
       </div>
     </section>
   );

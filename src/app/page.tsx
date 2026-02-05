@@ -10,7 +10,6 @@ import HowItWork from "@/components/HowItWork/HowItWork";
 import Contact from "@/components/Contact/Contact";
 import Footer from "@/components/Footer/Footer";
 
-
 export default function HomePage() {
     return (
         <>
@@ -19,9 +18,9 @@ export default function HomePage() {
             <IntroSection />
             <Stats />
             <Features />
-            <CTA/>
-            <HowItWork/>
+            <HowItWork />
             <Contact />
+            <CTA />
             <Footer />
         </>
     );
