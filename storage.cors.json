@@ -1,0 +1,12 @@
+[
+    {
+        "origin": [
+            "https://lingo-handwriting-recognition.netlify.app",
+            "http://localhost:3000",
+            "http://127.0.0.1:3000"
+        ],
+        "method": ["GET", "HEAD", "OPTIONS"],
+        "responseHeader": ["Content-Type", "Content-Disposition", "X-Goog-Resumable"],
+        "maxAgeSeconds": 3600
+    }
+]

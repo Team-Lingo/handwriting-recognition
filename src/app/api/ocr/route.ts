@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { ImageAnnotatorClient } from "@google-cloud/vision";
+import os from "os";
 import path from "path";
 import fs from "fs/promises";
 import crypto from "crypto";
@@ -47,7 +48,12 @@ const visionClient = new ImageAnnotatorClient({
     projectId: process.env.GOOGLE_CLOUD_PROJECT_ID,
 });
 
-const dataFile = path.join(process.cwd(), ".tmp", "ocrData.json");
+const tmpBase = path.join(os.tmpdir(), "handwriting-recognition");
+const dataFile = path.join(tmpBase, "ocrData.json");
+
+async function ensureTmpDir(): Promise<void> {
+    await fs.mkdir(tmpBase, { recursive: true });
+}
 
 type FileKind = "image" | "pdf" | "pptx";
 
@@ -132,8 +138,7 @@ export async function POST(req: NextRequest) {
         const file = form.get("file") as File | null;
         const fileUrl = form.get("fileUrl") as string | null;
 
-        const tmpBase = path.join(process.cwd(), ".tmp");
-        await fs.mkdir(tmpBase, { recursive: true });
+        await ensureTmpDir();
 
         let buffer: Buffer;
         let contentType: string | null = null;
@@ -220,8 +225,8 @@ export async function POST(req: NextRequest) {
                                     }
                                     return m.message ?? "";
                                 })
-                                .filter(Boolean)
-                        )
+                                .filter(Boolean),
+                        ),
                     );
 
                     payload = {
@@ -257,12 +262,18 @@ export async function POST(req: NextRequest) {
 // =================== GET ===================
 export async function GET(req: NextRequest) {
     try {
+        await ensureTmpDir();
         const key = req.nextUrl.searchParams.get("key");
         const question = req.nextUrl.searchParams.get("question") || "";
         if (!key) return NextResponse.json({ error: "No key provided" }, { status: 400 });
 
-        const raw = await fs.readFile(dataFile, "utf-8");
-        const existingData: Record<string, OcrResponse> = JSON.parse(raw);
+        let existingData: Record<string, OcrResponse> = {};
+        try {
+            const raw = await fs.readFile(dataFile, "utf-8");
+            existingData = JSON.parse(raw);
+        } catch {
+            return NextResponse.json({ error: "No data found for this key" }, { status: 404 });
+        }
         const userData = existingData[key];
         if (!userData) return NextResponse.json({ error: "No data found for this key" }, { status: 404 });
 
@@ -338,7 +349,7 @@ Answer clearly, helpfully, with examples if possible, in user's language, using 
         console.error(err);
         return NextResponse.json(
             { error: "Failed to fetch chat answer", details: (err as Error).message },
-            { status: 500 }
+            { status: 500 },
         );
     }
 }

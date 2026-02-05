@@ -93,7 +93,6 @@ export default function DocumentsClient() {
 
     useEffect(() => {
         void loadFiles();
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [user]);
 
     useEffect(() => {
@@ -101,7 +100,6 @@ export default function DocumentsClient() {
         if (!requestedFileId) return;
 
         const select = async () => {
-            // Prefer from current list, otherwise fetch directly.
             const existing = files.find((f) => f.fileId === requestedFileId) || null;
             const rec = existing || (await getUserFile(user.uid, requestedFileId));
             if (!rec) return;
@@ -133,16 +131,8 @@ export default function DocumentsClient() {
         setBusyAnalyze(true);
         setError(null);
         try {
-            const resp = await fetch(url);
-            if (!resp.ok) throw new Error("Failed to download file for analysis");
-            const blob = await resp.blob();
-
-            const file = new File([blob], rec.name || "document", {
-                type: rec.contentType || blob.type || "application/octet-stream",
-            });
-
             const formData = new FormData();
-            formData.append("file", file);
+            formData.append("fileUrl", url);
             const res = await fetch("/api/ocr", { method: "POST", body: formData });
             if (!res.ok) {
                 const body = await res.json().catch(() => ({}));
@@ -177,7 +167,6 @@ export default function DocumentsClient() {
         if (activeFile.status === "analyzed" && activeFile.ocr) return;
 
         void analyzeExisting(activeFile, activeUrl);
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [user, activeFile?.fileId, activeUrl]);
 
     const firstName = userProfile?.firstName || user?.displayName?.split(" ")[0] || "User";
