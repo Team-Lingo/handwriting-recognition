@@ -209,6 +209,29 @@ export default function DocumentsClient() {
         }
     };
 
+    const exportToTxt = () => {
+        if (!activeText) return;
+        
+        try {
+            const fileName = activeFile?.name 
+                ? `${activeFile.name.split('.')[0]}_extracted.txt` 
+                : "document_extracted.txt";
+                
+            const blob = new Blob([activeText], { type: "text/plain;charset=utf-8" });
+            const url = window.URL.createObjectURL(blob);
+            const link = document.createElement("a");
+            link.href = url;
+            link.download = fileName;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            window.URL.revokeObjectURL(url);
+        } catch (error) {
+            console.error("Error exporting TXT:", error);
+            setError("Failed to export as TXT");
+        }
+    };
+
     const fileCards = useMemo(() => {
         return files.map((f) => {
             const createdAt = f.createdAt?.toDate?.() || null;
@@ -395,14 +418,24 @@ export default function DocumentsClient() {
                                     <div className="documents-report-title" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                         <span>Extracted Text</span>
                                         {activeText && (
-                                            <button 
-                                                onClick={exportToDocx}
-                                                className="documents-upload-btn"
-                                                style={{ padding: '0.25rem 0.75rem', fontSize: '0.8rem', width: 'auto', marginTop: 0 }}
-                                                title="Export text to DOCX file"
-                                            >
-                                                Export DOCX
-                                            </button>
+                                            <div style={{ display: 'flex', gap: '8px' }}>
+                                                <button 
+                                                    onClick={exportToTxt}
+                                                    className="documents-upload-btn"
+                                                    style={{ padding: '0.25rem 0.75rem', fontSize: '0.8rem', width: 'auto', marginTop: 0 }}
+                                                    title="Export text to TXT file"
+                                                >
+                                                    Export TXT
+                                                </button>
+                                                <button 
+                                                    onClick={exportToDocx}
+                                                    className="documents-upload-btn"
+                                                    style={{ padding: '0.25rem 0.75rem', fontSize: '0.8rem', width: 'auto', marginTop: 0 }}
+                                                    title="Export text to DOCX file"
+                                                >
+                                                    Export DOCX
+                                                </button>
+                                            </div>
                                         )}
                                     </div>
                                     <div className="documents-report-text">
