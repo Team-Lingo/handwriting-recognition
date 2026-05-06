@@ -176,6 +176,39 @@ export default function DocumentsClient() {
 
     const hasActivePreview = Boolean(activeUrl) && (activeFile?.contentType || "").startsWith("image/");
 
+    const exportToDocx = async () => {
+        if (!activeText) return;
+        
+        try {
+            const fileName = activeFile?.name 
+                ? `${activeFile.name.split('.')[0]}_extracted.docx` 
+                : "document_extracted.docx";
+            
+            const response = await fetch("/api/export-docx", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ text: activeText, filename: fileName }),
+            });
+
+            if (!response.ok) {
+                throw new Error("Failed to generate DOCX on the server");
+            }
+
+            const blob = await response.blob();
+            const url = window.URL.createObjectURL(blob);
+            const link = document.createElement("a");
+            link.href = url;
+            link.download = fileName;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            window.URL.revokeObjectURL(url);
+        } catch (error) {
+            console.error("Error exporting DOCX:", error);
+            setError("Failed to export as DOCX");
+        }
+    };
+
     const fileCards = useMemo(() => {
         return files.map((f) => {
             const createdAt = f.createdAt?.toDate?.() || null;
@@ -359,7 +392,19 @@ export default function DocumentsClient() {
                                 </div>
 
                                 <div className="documents-report-card">
-                                    <div className="documents-report-title">Extracted Text</div>
+                                    <div className="documents-report-title" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                        <span>Extracted Text</span>
+                                        {activeText && (
+                                            <button 
+                                                onClick={exportToDocx}
+                                                className="documents-upload-btn"
+                                                style={{ padding: '0.25rem 0.75rem', fontSize: '0.8rem', width: 'auto', marginTop: 0 }}
+                                                title="Export text to DOCX file"
+                                            >
+                                                Export DOCX
+                                            </button>
+                                        )}
+                                    </div>
                                     <div className="documents-report-text">
                                         {activeText || "No extracted text saved for this document."}
                                     </div>
