@@ -8,6 +8,8 @@ import { detectLanguage } from "@/utils/detectLanguage";
 import levenshtein from "fast-levenshtein";
 import pdfParse from "pdf-parse";
 import JSZip from "jszip";
+import mammoth from "mammoth";
+import * as XLSX from "xlsx";
 
 // =================== Types ===================
 export interface OcrResponse {
@@ -55,11 +57,12 @@ async function ensureTmpDir(): Promise<void> {
     await fs.mkdir(tmpBase, { recursive: true });
 }
 
-type FileKind = "image" | "pdf" | "pptx";
+type FileKind = "image" | "pdf" | "pptx" | "docx" | "xlsx";
 
 function inferFileKind(contentType: string | null | undefined, filename: string | null | undefined): FileKind {
     const lowerName = (filename || "").toLowerCase();
     const ct = (contentType || "").toLowerCase();
+    
     if (ct.startsWith("image/")) return "image";
     if (ct === "application/pdf" || lowerName.endsWith(".pdf")) return "pdf";
     if (
@@ -68,7 +71,21 @@ function inferFileKind(contentType: string | null | undefined, filename: string 
     ) {
         return "pptx";
     }
-    // Default to image (most common) and let Vision throw if unsupported.
+    if (
+        ct === "application/vnd.openxmlformats-officedocument.wordprocessingml.document" || 
+        lowerName.endsWith(".docx")
+    ) {
+        return "docx";
+    }
+    if (
+        ct === "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" || 
+        ct === "application/vnd.ms-excel" || 
+        lowerName.endsWith(".xlsx") || 
+        lowerName.endsWith(".xls")
+    ) {
+        return "xlsx";
+    }
+    
     return "image";
 }
 
@@ -106,6 +123,21 @@ async function extractPptxText(buffer: Buffer): Promise<string> {
         }
     }
 
+    return chunks.join("\n\n").trim();
+}
+
+async function extractExcelText(buffer: Buffer): Promise<string> {
+    const workbook = XLSX.read(buffer, { type: "buffer" });
+    const chunks: string[] = [];
+    
+    for (const sheetName of workbook.SheetNames) {
+        const worksheet = workbook.Sheets[sheetName];
+        // تحويل الجدول إلى نص مفصول بمسافات واسطر
+        const sheetText = XLSX.utils.sheet_to_txt(worksheet);
+        if (sheetText.trim()) {
+            chunks.push(`--- Sheet: ${sheetName} ---\n${sheetText}`);
+        }
+    }
     return chunks.join("\n\n").trim();
 }
 
@@ -170,6 +202,11 @@ export async function POST(req: NextRequest) {
             text = (parsed.text || "").trim();
         } else if (kind === "pptx") {
             text = await extractPptxText(buffer);
+        } else if (kind === "docx") {
+            const result = await mammoth.extractRawText({ buffer });
+            text = (result.value || "").trim();
+        } else if (kind === "xlsx") {
+            text = await extractExcelText(buffer);
         } else {
             // Image OCR via Google Vision
             const [result] = await visionClient.textDetection(buffer);
@@ -255,7 +292,7 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ key, ...payload });
     } catch (err) {
         console.error(err);
-        return NextResponse.json({ error: (err as Error).message || "OCR failed" }, { status: 500 });
+        return NextResponse.json({ error: (err as Error).message || "File processing failed" }, { status: 500 });
     }
 }
 
@@ -289,7 +326,6 @@ export async function GET(req: NextRequest) {
 
         const lowerQuestion = question.trim().toLowerCase();
         if (simpleResponses[lowerQuestion]) {
-            // Save history even for simple replies
             userData.history = userData.history || [];
             userData.history.push({ question, answer: simpleResponses[lowerQuestion] });
             existingData[key] = userData;
@@ -299,10 +335,6 @@ export async function GET(req: NextRequest) {
         }
 
         const questionLang = /[ء-ي]/.test(question) ? "ar" : "en";
-
-        // ================= OpenRouter LLM call =================
-        const OR_KEY = process.env.OPENROUTER_API_KEY;
-        const OR_MODEL = process.env.OPENROUTER_MODEL || "meta-llama/llama-3.1-8b-instruct";
 
         const historyText =
             userData.history?.map((h) => `User: ${h.question}\nAssistant: ${h.answer}`).join("\n") || "";
@@ -319,23 +351,70 @@ Language: ${questionLang === "ar" ? "Arabic" : "English"}
 Answer clearly, helpfully, with examples if possible, in user's language, using context and notes.
 `;
 
-        const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-            method: "POST",
-            headers: { Authorization: `Bearer ${OR_KEY}`, "Content-Type": "application/json" },
-            body: JSON.stringify({
-                model: OR_MODEL,
-                messages: [{ role: "user", content: prompt }],
-                temperature: 0.7,
-                max_tokens: 700,
-            }),
-        });
-
         let answer = "";
-        if (response.ok) {
-            const data = await response.json();
-            answer = data.choices?.[0]?.message?.content || generateLocalReply(userData, question);
-        } else {
-            answer = generateLocalReply(userData, question);
+        let usedFallback = false;
+
+        // 1. المحاولة الأولى: استخدام الموديل الأساسي من OpenRouter
+        try {
+            const OR_KEY = process.env.OPENROUTER_API_KEY;
+            const OR_MODEL = process.env.OPENROUTER_MODEL || "meta-llama/llama-3.1-8b-instruct";
+
+            if (!OR_KEY) throw new Error("OpenRouter key missing");
+
+            const orResponse = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+                method: "POST",
+                headers: { Authorization: `Bearer ${OR_KEY}`, "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    model: OR_MODEL,
+                    messages: [{ role: "user", content: prompt }],
+                    temperature: 0.7,
+                    max_tokens: 700,
+                }),
+            });
+
+            if (orResponse.ok) {
+                const data = await orResponse.json();
+                answer = data.choices?.[0]?.message?.content || "";
+            } else {
+                throw new Error(`OpenRouter failed with status ${orResponse.status}`);
+            }
+        } catch (orError) {
+            console.warn("Primary LLM (OpenRouter) failed, switching to Fallback Gemini...", orError);
+            usedFallback = true;
+        }
+
+        // 2. المحاولة الثانية (Fallback): العمل تلقائياً بـ Gemini إذا فشل الموديل الأساسي
+        if (usedFallback || !answer) {
+            try {
+                const GEMINI_KEY = process.env.GEMINI_API_KEY;
+                if (!GEMINI_KEY) throw new Error("Gemini API key missing");
+
+                // استدعاء واجهة جوجل جيميناي الرسمية المجانية مباشرة
+                const geminiResponse = await fetch(
+                    `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_KEY}`,
+                    {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                            contents: [{ parts: [{ text: prompt }] }],
+                            generationConfig: {
+                                temperature: 0.7,
+                                maxOutputTokens: 700
+                            }
+                        }),
+                    }
+                );
+
+                if (geminiResponse.ok) {
+                    const geminiData = await geminiResponse.json();
+                    answer = geminiData.candidates?.[0]?.content?.parts?.[0]?.text || "";
+                } else {
+                    throw new Error(`Gemini Fallback failed with status ${geminiResponse.status}`);
+                }
+            } catch (geminiError) {
+                console.error("All LLM services failed. Relying on local reply.", geminiError);
+                answer = generateLocalReply(userData, question);
+            }
         }
 
         // ================= Save history ==================
