@@ -45,3 +45,6 @@ next-env.d.ts
 
 # local history
 /.tmp/
+# Ignore PyTorch model weights
+*.pth
+*.pt
