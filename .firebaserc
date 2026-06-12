@@ -1,5 +1,8 @@
 {
   "projects": {
-    "default": "lingo-handwriting-recognition"
-  }
+    "default": "lingo-handwriting-recognition",
+    "handwriting": "lingo-handwriting-recognition"
+  },
+  "targets": {},
+  "etags": {}
 }
