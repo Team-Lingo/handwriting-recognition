@@ -1,0 +1,154 @@
+GUIDE: Package the dashboard as an Android app (PWA + Bubblewrap)
+==================================================================
+
+The app stays hosted at https://lingo-handwriting-recognition.netlify.app/.
+We make it a PWA, then wrap that URL into a signed APK.
+
+PART 1 — MAKE THE APP A PWA
+---------------------------
+
+1. Create src/app/manifest.ts:
+
+   import type { MetadataRoute } from "next";
+
+   export default function manifest(): MetadataRoute.Manifest {
+     return {
+       name: "Handwriting Recognition",
+       short_name: "Handwriting",
+       description: "Handwriting recognition and document processing",
+       start_url: "/dashboard",
+       display: "standalone",
+       background_color: "#ffffff",
+       theme_color: "#1d4ed8",        // match brand color
+       orientation: "portrait",
+       icons: [
+         { src: "/icons/icon-192.png", sizes: "192x192", type: "image/png" },
+         { src: "/icons/icon-512.png", sizes: "512x512", type: "image/png" },
+         { src: "/icons/maskable-512.png", sizes: "512x512", type: "image/png", purpose: "maskable" },
+       ],
+     };
+   }
+
+2. Generate icons from public/logo.png into public/icons/:
+
+   npx pwa-asset-generator public/logo.png public/icons
+
+   Needed: icon-192.png, icon-512.png, and maskable-512.png (the maskable one
+   needs ~20% padding around the logo — make it at https://maskable.app/editor).
+
+3. In src/app/layout.tsx, add next to the existing metadata export:
+
+   import type { Viewport } from "next";
+
+   export const viewport: Viewport = {
+     themeColor: "#1d4ed8",   // same as manifest
+   };
+
+4. Add a service worker with Serwist:
+
+   npm i @serwist/next serwist
+
+   a) In next.config.ts, wrap the existing config (keep everything in it):
+
+      import withSerwistInit from "@serwist/next";
+
+      const withSerwist = withSerwistInit({
+        swSrc: "src/app/sw.ts",
+        swDest: "public/sw.js",
+        disable: process.env.NODE_ENV === "development",
+      });
+
+      // ...existing nextConfig unchanged...
+
+      export default withSerwist(nextConfig);
+
+   b) Create src/app/sw.ts:
+
+      import { defaultCache } from "@serwist/next/worker";
+      import type { PrecacheEntry, SerwistGlobalConfig } from "serwist";
+      import { Serwist } from "serwist";
+
+      declare global {
+        interface WorkerGlobalScope extends SerwistGlobalConfig {
+          __SW_MANIFEST: (PrecacheEntry | string)[] | undefined;
+        }
+      }
+
+      declare const self: WorkerGlobalScope & ServiceWorkerGlobalScope;
+
+      const serwist = new Serwist({
+        precacheEntries: self.__SW_MANIFEST,
+        skipWaiting: true,
+        clientsClaim: true,
+        navigationPreload: true,
+        runtimeCaching: defaultCache,
+      });
+
+      serwist.addEventListeners();
+
+   c) Add public/sw.js and public/swe-worker*.js to .gitignore.
+
+   d) In tsconfig.json compilerOptions: add "webworker" to "lib" and set
+      "types": ["@serwist/next/typings"].
+
+5. Deploy to Netlify, then check that
+   https://lingo-handwriting-recognition.netlify.app/manifest.webmanifest
+   loads, and run Chrome DevTools -> Lighthouse -> PWA audit on the site.
+   Fix anything it flags.
+
+PART 2 — BUILD THE APK
+----------------------
+
+6. Install tools (one-time):
+
+   winget install Microsoft.OpenJDK.17
+   npm i -g @bubblewrap/cli
+
+7. Create a folder android/ in the repo, and from inside it run:
+
+   bubblewrap init --manifest https://lingo-handwriting-recognition.netlify.app/manifest.webmanifest
+
+   - If it offers to download the Android SDK, say yes.
+   - Application ID: com.yourteam.handwriting (permanent, pick carefully)
+   - Let it create a new signing key (android.keystore).
+
+   BACK UP android.keystore AND ITS PASSWORDS. Losing them means you can
+   never update the app on the Play Store. Add it to .gitignore.
+
+8. Build:
+
+   bubblewrap build
+
+   Output: app-release-signed.apk (direct install) and
+   app-release-bundle.aab (Play Store upload).
+
+9. Remove the browser URL bar (Digital Asset Links):
+
+   a) Run: bubblewrap fingerprint
+   b) Create public/.well-known/assetlinks.json:
+
+      [{
+        "relation": ["delegate_permission/common.handle_all_urls"],
+        "target": {
+          "namespace": "android_app",
+          "package_name": "com.yourteam.handwriting",
+          "sha256_cert_fingerprints": ["<fingerprint from step a>"]
+        }
+      }]
+
+   c) Deploy to Netlify.
+
+   If publishing on the Play Store: Google re-signs the app, so also add
+   Google's SHA-256 (Play Console -> Setup -> App integrity) to the array.
+
+10. Test: copy app-release-signed.apk to a phone and install it (or
+    `adb install app-release-signed.apk`). It should open full screen with
+    no URL bar; check login and file upload work.
+
+NOTES
+-----
+- Normal web deploys update the app automatically — only rebuild the APK
+  when the name, icons, app ID, or URL change. Rebuild with:
+  bubblewrap update && bubblewrap build
+- The app is permanently tied to its domain. If a custom domain is ever
+  planned, attach it BEFORE doing Part 2.
