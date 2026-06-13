@@ -53,8 +53,40 @@ const visionClient = new ImageAnnotatorClient({
 const tmpBase = path.join(os.tmpdir(), "handwriting-recognition");
 const dataFile = path.join(tmpBase, "ocrData.json");
 
+// ذاكرة احتياطية سريعة في حال بيئات العمل السحابية (Serverless environment fallback)
+const globalCache = global as typeof globalThis & { ocrMemoryDb?: Record<string, OcrResponse> };
+if (!globalCache.ocrMemoryDb) {
+    globalCache.ocrMemoryDb = {};
+}
+
 async function ensureTmpDir(): Promise<void> {
-    await fs.mkdir(tmpBase, { recursive: true });
+    try {
+        await fs.mkdir(tmpBase, { recursive: true });
+    } catch (e) {
+        console.warn("Temporary directory creation skipped or un-writable in serverless environment.");
+    }
+}
+
+// دالة موحدة للقراءة الآمنة من الـ File System والـ Cache معاً
+async function readDataStore(): Promise<Record<string, OcrResponse>> {
+    let fileData: Record<string, OcrResponse> = {};
+    try {
+        const raw = await fs.readFile(dataFile, "utf-8");
+        fileData = JSON.parse(raw);
+    } catch {}
+    
+    // دمج بيانات الملف مع الذاكرة العشوائية لضمان عدم ضياع الداتا
+    return { ...globalCache.ocrMemoryDb, ...fileData };
+}
+
+// دالة موحدة للكتابة الآمنة في الـ File System والـ Cache معاً
+async function writeDataStore(data: Record<string, OcrResponse>): Promise<void> {
+    globalCache.ocrMemoryDb = { ...globalCache.ocrMemoryDb, ...data };
+    try {
+        await fs.writeFile(dataFile, JSON.stringify(data, null, 2), "utf-8");
+    } catch (e) {
+        console.warn("Writing to local storage failed (Expected on Serverless like Vercel). Memory cache handled it.");
+    }
 }
 
 type FileKind = "image" | "pdf" | "pptx" | "docx" | "xlsx";
@@ -132,7 +164,6 @@ async function extractExcelText(buffer: Buffer): Promise<string> {
     
     for (const sheetName of workbook.SheetNames) {
         const worksheet = workbook.Sheets[sheetName];
-        // تحويل الجدول إلى نص مفصول بمسافات واسطر
         const sheetText = XLSX.utils.sheet_to_txt(worksheet);
         if (sheetText.trim()) {
             chunks.push(`--- Sheet: ${sheetName} ---\n${sheetText}`);
@@ -208,7 +239,6 @@ export async function POST(req: NextRequest) {
         } else if (kind === "xlsx") {
             text = await extractExcelText(buffer);
         } else {
-            // Image OCR via Google Vision
             const [result] = await visionClient.textDetection(buffer);
             text = result.fullTextAnnotation?.text || "";
         }
@@ -223,13 +253,19 @@ export async function POST(req: NextRequest) {
             history: [],
         };
 
-        // ================== English correction ==================
-        if (language === "English") {
+        // ================== Dynamic Language Correction (Multi-Language Support) ==================
+        if (language) {
             try {
+                let langCode = "en-US";
+                if (language === "Arabic" || language === "ar") langCode = "ar";
+                else if (language === "French" || language === "fr") langCode = "fr";
+                else if (language === "Spanish" || language === "es") langCode = "es";
+                else if (language === "German" || language === "de") langCode = "de";
+
                 const ltRes = await fetch("https://api.languagetool.org/v2/check", {
                     method: "POST",
                     headers: { "Content-Type": "application/x-www-form-urlencoded" },
-                    body: new URLSearchParams({ text, language: "en-US" }),
+                    body: new URLSearchParams({ text, language: langCode }),
                 });
 
                 if (ltRes.ok) {
@@ -278,16 +314,11 @@ export async function POST(req: NextRequest) {
             }
         }
 
-        // ================== Save OCR data ==================
-        let existingData: Record<string, OcrResponse> = {};
-        try {
-            const raw = await fs.readFile(dataFile, "utf-8");
-            existingData = JSON.parse(raw);
-        } catch {}
-
+        // ================== Save OCR data Safe ==================
+        const existingData = await readDataStore();
         const key = crypto.createHash("md5").update(text).digest("hex");
         existingData[key] = payload;
-        await fs.writeFile(dataFile, JSON.stringify(existingData, null, 2), "utf-8");
+        await writeDataStore(existingData);
 
         return NextResponse.json({ key, ...payload });
     } catch (err) {
@@ -304,13 +335,7 @@ export async function GET(req: NextRequest) {
         const question = req.nextUrl.searchParams.get("question") || "";
         if (!key) return NextResponse.json({ error: "No key provided" }, { status: 400 });
 
-        let existingData: Record<string, OcrResponse> = {};
-        try {
-            const raw = await fs.readFile(dataFile, "utf-8");
-            existingData = JSON.parse(raw);
-        } catch {
-            return NextResponse.json({ error: "No data found for this key" }, { status: 404 });
-        }
+        const existingData = await readDataStore();
         const userData = existingData[key];
         if (!userData) return NextResponse.json({ error: "No data found for this key" }, { status: 404 });
 
@@ -329,7 +354,7 @@ export async function GET(req: NextRequest) {
             userData.history = userData.history || [];
             userData.history.push({ question, answer: simpleResponses[lowerQuestion] });
             existingData[key] = userData;
-            await fs.writeFile(dataFile, JSON.stringify(existingData, null, 2), "utf-8");
+            await writeDataStore(existingData);
 
             return NextResponse.json({ answer: simpleResponses[lowerQuestion] });
         }
@@ -368,7 +393,7 @@ Answer clearly, helpfully, with examples if possible, in user's language, using 
                     model: OR_MODEL,
                     messages: [{ role: "user", content: prompt }],
                     temperature: 0.7,
-                    max_tokens: 700,
+                    max_tokens: 700
                 }),
             });
 
@@ -389,7 +414,6 @@ Answer clearly, helpfully, with examples if possible, in user's language, using 
                 const GEMINI_KEY = process.env.GEMINI_API_KEY;
                 if (!GEMINI_KEY) throw new Error("Gemini API key missing");
 
-                // استدعاء واجهة جوجل جيميناي الرسمية المجانية مباشرة
                 const geminiResponse = await fetch(
                     `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_KEY}`,
                     {
@@ -417,11 +441,11 @@ Answer clearly, helpfully, with examples if possible, in user's language, using 
             }
         }
 
-        // ================= Save history ==================
+        // ================= Save history Safe ==================
         userData.history = userData.history || [];
         userData.history.push({ question, answer });
         existingData[key] = userData;
-        await fs.writeFile(dataFile, JSON.stringify(existingData, null, 2), "utf-8");
+        await writeDataStore(existingData);
 
         return NextResponse.json({ answer });
     } catch (err) {
