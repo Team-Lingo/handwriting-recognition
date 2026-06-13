@@ -13,6 +13,7 @@ import {
     MdLogout,
     MdDescription,
     MdTranslate,
+    MdChat,
 } from "react-icons/md";
 import { User } from "firebase/auth";
 import { UserProfile } from "@/types/profile";
@@ -36,6 +37,7 @@ const sidebarItems: SidebarItem[] = [
     { id: "documents", label: "Documents", icon: <MdDescription />, href: "/documents" },
     { id: "language-detection", label: "Language Detection", icon: <MdTranslate />, href: "/language-detection" },
     { id: "history", label: "History", icon: <MdHistory />, href: "/history" },
+    { id: "ai-chat", label: "AI Chat", icon: <MdChat />, href: "/ai-chat" },
 ];
 
 const bottomItems: SidebarItem[] = [
@@ -55,6 +57,7 @@ export default function DashboardSidebar({ user, userProfile }: DashboardSidebar
         if (pathname?.startsWith("/history")) return "history";
         if (pathname?.startsWith("/contact")) return "contact";
         if (pathname?.startsWith("/settings")) return "settings";
+        if (pathname?.startsWith("/ai-chat")) return "ai-chat";
         return "dashboard";
     })();
 
