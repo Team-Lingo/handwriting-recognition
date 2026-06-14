@@ -81,7 +81,7 @@ def verify_signature(req: https_fn.Request) -> https_fn.Response:
     # 1. Handle CORS instantly (No ML needed yet)
     if req.method == "OPTIONS":
         headers = {
-            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Origin": "*", # instead of "*" specify live production app domain
             "Access-Control-Allow-Methods": "POST",
             "Access-Control-Allow-Headers": "Content-Type",
             "Access-Control-Max-Age": "3600"
