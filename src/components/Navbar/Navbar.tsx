@@ -8,8 +8,7 @@ import "./Navbar.css";
 const LINKS = [
     { href: "/", label: "Home" },
     { href: "/features", label: "Features" },
-    { href: "/pricing", label: "Pricing" },
-    { href: "/solutions", label: "Solutions" },
+    { href: "/Help", label: "Help" },
     { href: "/contact", label: "Contact" },
 ];
 
