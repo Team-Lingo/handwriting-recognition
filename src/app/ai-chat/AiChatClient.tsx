@@ -228,7 +228,7 @@ export default function AiChatClient() {
                             <div className="ai-chat-input-area">
                                 <input ref={fileInputRef} type="file" className="ai-chat-file-input" onChange={(e) => handleFileSelect(e.target.files)} hidden />
                                 <button className="ai-chat-attach-btn" onClick={() => fileInputRef.current?.click()}><MdAttachFile /></button>
-                                <textarea ref={textareaRef} className="ai-chat-input" placeholder="اسألني أي شيء..." value={input} onChange={handleInputChange} onKeyDown={handleKeyDown} rows={1} />
+                                <textarea ref={textareaRef} className="ai-chat-input" placeholder="Ask me anything..." value={input} onChange={handleInputChange} onKeyDown={handleKeyDown} rows={1} />
                                 <button className="ai-chat-send-btn" onClick={() => void handleSend()} disabled={busy}><MdSend /></button>
                             </div>
                         </div>
