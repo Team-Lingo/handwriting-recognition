@@ -1,12 +1,16 @@
 import React from 'react'
 import Navbar from '@/components/Navbar/Navbar';
-import ComingSoon from '@/components/ComingSoon/ComingSoon';
+import Features from '@/components/Features/Features';
+import HowItWork from '@/components/HowItWork/HowItWork';
+import Footer from '@/components/Footer/Footer';
 
 const featuresPage = () => {
   return (
     <>
       <Navbar />
-      <ComingSoon />
+      <Features />
+      <HowItWork />
+      <Footer />
     </>
   )
 }
