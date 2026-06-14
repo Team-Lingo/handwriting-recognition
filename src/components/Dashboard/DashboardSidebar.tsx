@@ -87,73 +87,90 @@ export default function DashboardSidebar({ user, userProfile }: DashboardSidebar
 
     const displayEmail = user?.email || "";
 
+    const currentActiveId = derivedActiveId || activeId;
+
     return (
-        <aside className="dashboard-sidebar">
-            <div className="sidebar-header">
-                <div className="sidebar-logo">
-                    <Image src="/images/Logo.png" alt="Lingo Logo" width={32} height={32} className="logo-icon" />
+        <>
+            <aside className="dashboard-sidebar">
+                <div className="sidebar-header">
+                    <div className="sidebar-logo">
+                        <Image src="/images/Logo.png" alt="Lingo Logo" width={32} height={32} className="logo-icon" />
+                    </div>
                 </div>
-            </div>
 
-            <nav className="sidebar-nav">
-                <div className="sidebar-section">
-                    {sidebarItems.map((item) => (
-                        <Link
-                            key={item.id}
-                            href={item.href}
-                            className={`sidebar-item ${(derivedActiveId || activeId) === item.id ? "active" : ""}`}
-                            onClick={() => setActiveId(item.id)}>
-                            <span className="sidebar-icon">{item.icon}</span>
-                            <span className="sidebar-label">{item.label}</span>
-                        </Link>
-                    ))}
-                </div>
-            </nav>
+                <nav className="sidebar-nav">
+                    <div className="sidebar-section">
+                        {sidebarItems.map((item) => (
+                            <Link
+                                key={item.id}
+                                href={item.href}
+                                className={`sidebar-item ${currentActiveId === item.id ? "active" : ""}`}
+                                onClick={() => setActiveId(item.id)}>
+                                <span className="sidebar-icon">{item.icon}</span>
+                                <span className="sidebar-label">{item.label}</span>
+                            </Link>
+                        ))}
+                    </div>
+                </nav>
 
-            <div className="sidebar-footer">
-                <div className={`sidebar-bottom-menu ${isMenuOpen ? "open" : ""}`}>
-                    {bottomItems.map((item, index) => (
-                        <Link
-                            key={item.id}
-                            href={item.href}
-                            className={`sidebar-item ${(derivedActiveId || activeId) === item.id ? "active" : ""}`}
-                            onClick={() => setActiveId(item.id)}
-                            style={{ animationDelay: `${index * 50}ms` }}>
-                            <span className="sidebar-icon">{item.icon}</span>
-                            <span className="sidebar-label">{item.label}</span>
-                        </Link>
-                    ))}
-                    <button
-                        className="sidebar-item logout-item"
-                        onClick={handleLogout}
-                        style={{ animationDelay: `${bottomItems.length * 50}ms` }}>
-                        <span className="sidebar-icon">
-                            <MdLogout />
-                        </span>
-                        <span className="sidebar-label">Log Out</span>
+                <div className="sidebar-footer">
+                    <div className={`sidebar-bottom-menu ${isMenuOpen ? "open" : ""}`}>
+                        {bottomItems.map((item, index) => (
+                            <Link
+                                key={item.id}
+                                href={item.href}
+                                className={`sidebar-item ${currentActiveId === item.id ? "active" : ""}`}
+                                onClick={() => setActiveId(item.id)}
+                                style={{ animationDelay: `${index * 50}ms` }}>
+                                <span className="sidebar-icon">{item.icon}</span>
+                                <span className="sidebar-label">{item.label}</span>
+                            </Link>
+                        ))}
+                        <button
+                            className="sidebar-item logout-item"
+                            onClick={handleLogout}
+                            style={{ animationDelay: `${bottomItems.length * 50}ms` }}>
+                            <span className="sidebar-icon">
+                                <MdLogout />
+                            </span>
+                            <span className="sidebar-label">Log Out</span>
+                        </button>
+                    </div>
+                    <button className="sidebar-user" onClick={() => setIsMenuOpen(!isMenuOpen)}>
+                        <div className="user-avatar">
+                            {userProfile?.profilePictureUrl ? (
+                                <Image
+                                    src={userProfile.profilePictureUrl}
+                                    alt="Profile"
+                                    width={40}
+                                    height={40}
+                                    className="user-avatar-img"
+                                />
+                            ) : (
+                                getInitials()
+                            )}
+                        </div>
+                        <div className="user-info">
+                            <div className="user-name">{displayName}</div>
+                            <div className="user-email">{displayEmail}</div>
+                        </div>
+                        <span className="user-menu-btn">{isMenuOpen ? <MdExpandMore /> : <MdExpandLess />}</span>
                     </button>
                 </div>
-                <button className="sidebar-user" onClick={() => setIsMenuOpen(!isMenuOpen)}>
-                    <div className="user-avatar">
-                        {userProfile?.profilePictureUrl ? (
-                            <Image
-                                src={userProfile.profilePictureUrl}
-                                alt="Profile"
-                                width={40}
-                                height={40}
-                                className="user-avatar-img"
-                            />
-                        ) : (
-                            getInitials()
-                        )}
-                    </div>
-                    <div className="user-info">
-                        <div className="user-name">{displayName}</div>
-                        <div className="user-email">{displayEmail}</div>
-                    </div>
-                    <span className="user-menu-btn">{isMenuOpen ? <MdExpandMore /> : <MdExpandLess />}</span>
-                </button>
-            </div>
-        </aside>
+            </aside>
+
+            <nav className="mobile-bottom-nav" aria-label="Mobile navigation">
+                {sidebarItems.map((item) => (
+                    <Link
+                        key={item.id}
+                        href={item.href}
+                        className={`mobile-nav-item ${currentActiveId === item.id ? "active" : ""}`}
+                        onClick={() => setActiveId(item.id)}>
+                        <span className="mobile-nav-icon">{item.icon}</span>
+                        <span className="mobile-nav-label">{item.label}</span>
+                    </Link>
+                ))}
+            </nav>
+        </>
     );
 }
