@@ -6,13 +6,10 @@ import fs from "fs/promises";
 import crypto from "crypto";
 import { detectLanguage } from "@/utils/detectLanguage";
 import levenshtein from "fast-levenshtein";
+import pdfParse from "pdf-parse";
 import JSZip from "jszip";
-import mammoth from "mammoth";
-import * as XLSX from "xlsx";
 
-export const runtime = "nodejs";
-export const dynamic = "force-dynamic";
-
+// =================== Types ===================
 export interface OcrResponse {
     text: string;
     correctedText?: string;
@@ -39,14 +36,14 @@ type LanguageToolMatch = {
     replacements?: LanguageToolReplacement[];
 };
 
-if (!process.env.GOOGLE_CLOUD_CLIENT_EMAIL || !process.env.GOOGLE_CLOUD_PRIVATE_KEY) {
-    console.warn("Google Vision credentials missing");
-}
+// =================== Config ===================
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
 const visionClient = new ImageAnnotatorClient({
     credentials: {
-        client_email: process.env.GOOGLE_CLOUD_CLIENT_EMAIL!,
-        private_key: process.env.GOOGLE_CLOUD_PRIVATE_KEY?.replace(/\\n/g, "\n")!,
+        client_email: process.env.GOOGLE_CLOUD_CLIENT_EMAIL,
+        private_key: process.env.GOOGLE_CLOUD_PRIVATE_KEY?.replace(/\\n/g, "\n"),
     },
     projectId: process.env.GOOGLE_CLOUD_PROJECT_ID,
 });
@@ -54,63 +51,29 @@ const visionClient = new ImageAnnotatorClient({
 const tmpBase = path.join(os.tmpdir(), "handwriting-recognition");
 const dataFile = path.join(tmpBase, "ocrData.json");
 
-const globalCache = globalThis as typeof globalThis & {
-    ocrMemoryDb?: Record<string, OcrResponse>;
-};
-
-if (!globalCache.ocrMemoryDb) {
-    globalCache.ocrMemoryDb = {};
+async function ensureTmpDir(): Promise<void> {
+    await fs.mkdir(tmpBase, { recursive: true });
 }
 
-async function ensureTmpDir() {
-    await fs.mkdir(tmpBase, { recursive: true }).catch(() => {});
-}
-
-async function readDataStore(): Promise<Record<string, OcrResponse>> {
-    let fileData: Record<string, OcrResponse> = {};
-
-    try {
-        const raw = await fs.readFile(dataFile, "utf8");
-        fileData = JSON.parse(raw);
-    } catch {}
-
-    return {
-        ...(globalCache.ocrMemoryDb || {}),
-        ...fileData,
-    };
-}
-
-async function writeDataStore(data: Record<string, OcrResponse>) {
-    const keys = Object.keys(data);
-
-    if (keys.length > 1000) {
-        delete data[keys[0]];
-    }
-
-    globalCache.ocrMemoryDb = data;
-
-    try {
-        await fs.writeFile(dataFile, JSON.stringify(data, null, 2), "utf8");
-    } catch {}
-}
-
-type FileKind = "image" | "pdf" | "pptx" | "docx" | "xlsx";
+type FileKind = "image" | "pdf" | "pptx";
 
 function inferFileKind(contentType: string | null | undefined, filename: string | null | undefined): FileKind {
-    const name = (filename || "").toLowerCase();
+    const lowerName = (filename || "").toLowerCase();
     const ct = (contentType || "").toLowerCase();
-
     if (ct.startsWith("image/")) return "image";
-    if (ct === "application/pdf" || name.endsWith(".pdf")) return "pdf";
-    if (name.endsWith(".pptx")) return "pptx";
-    if (name.endsWith(".docx")) return "docx";
-    if (name.endsWith(".xlsx") || name.endsWith(".xls")) return "xlsx";
-
+    if (ct === "application/pdf" || lowerName.endsWith(".pdf")) return "pdf";
+    if (
+        ct === "application/vnd.openxmlformats-officedocument.presentationml.presentation" ||
+        lowerName.endsWith(".pptx")
+    ) {
+        return "pptx";
+    }
+    // Default to image (most common) and let Vision throw if unsupported.
     return "image";
 }
 
-function decodeXmlEntities(text: string) {
-    return text
+function decodeXmlEntities(input: string): string {
+    return input
         .replace(/&lt;/g, "<")
         .replace(/&gt;/g, ">")
         .replace(/&amp;/g, "&")
@@ -118,45 +81,57 @@ function decodeXmlEntities(text: string) {
         .replace(/&#39;/g, "'");
 }
 
-async function extractPptxText(buffer: Buffer) {
+async function extractPptxText(buffer: Buffer): Promise<string> {
     const zip = await JSZip.loadAsync(buffer);
-    const slides = Object.keys(zip.files).filter((x) => x.match(/^ppt\/slides\/slide\d+\.xml$/));
+    const slideFiles = Object.keys(zip.files)
+        .filter((name) => /^ppt\/slides\/slide\d+\.xml$/.test(name))
+        .sort((a, b) => {
+            const na = Number(a.match(/slide(\d+)\.xml$/)?.[1] || 0);
+            const nb = Number(b.match(/slide(\d+)\.xml$/)?.[1] || 0);
+            return na - nb;
+        });
 
-    let result: string[] = [];
-
-    for (const slide of slides) {
-        const xml = await zip.file(slide)!.async("string");
-        const matches = [...xml.matchAll(/<a:t[^>]*>(.*?)<\/a:t>/g)];
-        result.push(matches.map((x) => decodeXmlEntities(x[1])).join(" "));
+    const chunks: string[] = [];
+    for (const slideName of slideFiles) {
+        const xml = await zip.file(slideName)!.async("string");
+        const texts: string[] = [];
+        const re = /<a:t[^>]*>([\s\S]*?)<\/a:t>/g;
+        let m: RegExpExecArray | null;
+        while ((m = re.exec(xml))) {
+            const t = decodeXmlEntities(m[1] || "").trim();
+            if (t) texts.push(t);
+        }
+        if (texts.length) {
+            chunks.push(texts.join(" "));
+        }
     }
 
-    return result.join("\n\n").trim();
+    return chunks.join("\n\n").trim();
 }
 
-async function extractExcelText(buffer: Buffer) {
-    const wb = XLSX.read(buffer, { type: "buffer" });
-    let result: string[] = [];
-
-    for (const sheet of wb.SheetNames) {
-        const ws = wb.Sheets[sheet];
-        const text = XLSX.utils.sheet_to_csv(ws);
-
-        if (text.trim()) result.push(`--- ${sheet} ---\n${text}`);
+// =================== Helpers ===================
+function getReason(match: LanguageToolMatch): string {
+    if (match.rule?.description) return match.rule.description.toLowerCase();
+    if (match.rule?.issueType) {
+        switch (match.rule.issueType.toLowerCase()) {
+            case "misspelling":
+                return "fixed a common spelling mistake";
+            case "grammar":
+                return "corrected grammar issue";
+            default:
+                return "corrected language issue";
+        }
     }
-
-    return result.join("\n\n");
+    return "corrected error";
 }
 
-function getReason(match: LanguageToolMatch) {
-    if (match.rule?.description) return match.rule.description;
-    return "corrected language issue";
+function generateLocalReply(userData: OcrResponse, question: string): string {
+    const notes = userData.notes?.join("; ") || "No notes";
+    const accuracy = userData.accuracy ?? "unknown";
+    return `سؤالك: "${question}". التحليل الذكي: ${notes}. دقة النص: ${accuracy}%`;
 }
 
-function generateLocalReply(data: OcrResponse, question: string) {
-    return `سؤالك: ${question}. \nالتحليل:\n${data.notes?.join(";") || "لا توجد ملاحظات"}\nالدقة:\n${data.accuracy ?? "غير معروفة"}%`;
-}
-
-// =================== POST METHOD ===================
+// =================== POST ===================
 export async function POST(req: NextRequest) {
     try {
         const form = await req.formData();
@@ -166,144 +141,143 @@ export async function POST(req: NextRequest) {
         await ensureTmpDir();
 
         let buffer: Buffer;
-        let filename = "";
-        let contentType = "";
-
+        let contentType: string | null = null;
+        let filename: string | null = null;
         if (fileUrl) {
-            const u = new URL(fileUrl);
-            if (!["http:", "https:"].includes(u.protocol)) throw new Error("Invalid URL");
-
-            const res = await fetch(fileUrl);
-            if (!res.ok) throw new Error("Download failed");
-
-            buffer = Buffer.from(await res.arrayBuffer());
-            contentType = res.headers.get("content-type") || "";
-            filename = u.pathname.split("/").pop() || "";
+            const response = await fetch(fileUrl);
+            if (!response.ok) throw new Error("Failed to fetch file from URL");
+            buffer = Buffer.from(await response.arrayBuffer());
+            contentType = response.headers.get("content-type");
+            try {
+                const u = new URL(fileUrl);
+                filename = u.pathname.split("/").pop() || null;
+            } catch {
+                filename = null;
+            }
         } else if (file) {
             buffer = Buffer.from(await file.arrayBuffer());
-            filename = file.name;
-            contentType = file.type;
+            contentType = file.type || null;
+            filename = file.name || null;
         } else {
-            return NextResponse.json({ error: "No file" }, { status: 400 });
+            return NextResponse.json({ error: "No file or fileUrl provided" }, { status: 400 });
         }
 
-        if (buffer.length > 20 * 1024 * 1024) throw new Error("File too large");
-
         const kind = inferFileKind(contentType, filename);
-        let text = "";
 
+        let text = "";
         if (kind === "pdf") {
-            const pdf = (await import("pdf-parse")).default;
-            const data = await pdf(buffer);
-            text = data.text || "";
+            const parsed = await pdfParse(buffer);
+            text = (parsed.text || "").trim();
         } else if (kind === "pptx") {
             text = await extractPptxText(buffer);
-        } else if (kind === "docx") {
-            const r = await mammoth.extractRawText({ buffer });
-            text = r.value || "";
-        } else if (kind === "xlsx") {
-            text = await extractExcelText(buffer);
         } else {
+            // Image OCR via Google Vision
             const [result] = await visionClient.textDetection(buffer);
             text = result.fullTextAnnotation?.text || "";
         }
-
         const language = detectLanguage(text);
 
         let payload: OcrResponse = {
             text,
             language,
+            correctedText: undefined,
+            accuracy: undefined,
+            notes: undefined,
             history: [],
         };
 
-        if (text) {
+        // ================== English correction ==================
+        if (language === "English") {
             try {
-                let lang = "en-US";
-
-                if (language === "Arabic" || language === "ar")
-                    lang = "ar";
-                else if (language === "French" || language === "fr")
-                    lang = "fr";
-                else if (language === "German" || language === "de")
-                    lang = "de";
-                else if (language === "Spanish" || language === "es")
-                    lang = "es";
-
-                const lt = await fetch("https://api.languagetool.org/v2/check", {
+                const ltRes = await fetch("https://api.languagetool.org/v2/check", {
                     method: "POST",
-                    headers: {
-                        "Content-Type": "application/x-www-form-urlencoded",
-                    },
-                    body: new URLSearchParams({
-                        text,
-                        language: lang,
-                    }),
+                    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+                    body: new URLSearchParams({ text, language: "en-US" }),
                 });
 
-                if (lt.ok) {
-                    const data = await lt.json();
-                    let corrected = text;
-                    const matches = data.matches || [];
+                if (ltRes.ok) {
+                    const data = (await ltRes.json()) as { matches?: LanguageToolMatch[] };
+                    let correctedText = text;
+                    const matches: LanguageToolMatch[] = data.matches || [];
+                    matches.sort((a, b) => b.offset - a.offset);
 
-                    matches.sort((a: any, b: any) => b.offset - a.offset);
-
-                    for (const m of matches) {
-                        if (m.replacements?.length) {
-                            corrected =
-                                corrected.slice(0, m.offset) +
-                                m.replacements[0].value +
-                                corrected.slice(m.offset + m.length);
+                    for (const match of matches) {
+                        if (match.replacements && match.replacements.length > 0) {
+                            const start = match.offset;
+                            const end = start + match.length;
+                            correctedText =
+                                correctedText.slice(0, start) + match.replacements[0].value + correctedText.slice(end);
                         }
                     }
 
-                    const distance = levenshtein.get(text, corrected);
-                    const accuracy = 100 - (distance / Math.max(text.length, corrected.length)) * 100;
+                    const distance = levenshtein.get(text, correctedText);
+                    const maxLength = Math.max(text.length, correctedText.length);
+                    const accuracy = maxLength > 0 ? (1 - distance / maxLength) * 100 : 100;
 
-                    payload.correctedText = corrected;
-                    payload.accuracy = Math.round(accuracy * 100) / 100;
-                    payload.notes = matches.map((m: any) => getReason(m));
+                    const notes = Array.from(
+                        new Set(
+                            matches
+                                .map((m) => {
+                                    if (m.replacements && m.replacements.length > 0) {
+                                        const original = text.slice(m.offset, m.offset + m.length);
+                                        const corrected = m.replacements[0].value;
+                                        return `Corrected "${original}" to "${corrected}" → ${getReason(m)}`;
+                                    }
+                                    return m.message ?? "";
+                                })
+                                .filter(Boolean),
+                        ),
+                    );
+
+                    payload = {
+                        ...payload,
+                        correctedText,
+                        accuracy: Math.round(accuracy * 100) / 100,
+                        notes,
+                    };
                 }
-            } catch {}
+            } catch (error) {
+                console.error("LanguageTool API error:", error);
+            }
         }
 
-        const db = await readDataStore();
+        // ================== Save OCR data ==================
+        let existingData: Record<string, OcrResponse> = {};
+        try {
+            const raw = await fs.readFile(dataFile, "utf-8");
+            existingData = JSON.parse(raw);
+        } catch {}
 
-        const key = crypto
-            .createHash("md5")
-            .update(text)
-            .digest("hex");
+        const key = crypto.createHash("md5").update(text).digest("hex");
+        existingData[key] = payload;
+        await fs.writeFile(dataFile, JSON.stringify(existingData, null, 2), "utf-8");
 
-        db[key] = payload;
-        await writeDataStore(db);
-
-        return NextResponse.json({
-            key,
-            ...payload,
-        });
-    } catch (e: any) {
-        return NextResponse.json({ error: e.message }, { status: 500 });
+        return NextResponse.json({ key, ...payload });
+    } catch (err) {
+        console.error(err);
+        return NextResponse.json({ error: (err as Error).message || "OCR failed" }, { status: 500 });
     }
 }
 
-// =================== GET METHOD ===================
+// =================== GET ===================
 export async function GET(req: NextRequest) {
     try {
         await ensureTmpDir();
-
         const key = req.nextUrl.searchParams.get("key");
         const question = req.nextUrl.searchParams.get("question") || "";
+        if (!key) return NextResponse.json({ error: "No key provided" }, { status: 400 });
 
-        if (!key) {
-            return NextResponse.json({ error: "No key provided" }, { status: 400 });
+        let existingData: Record<string, OcrResponse> = {};
+        try {
+            const raw = await fs.readFile(dataFile, "utf-8");
+            existingData = JSON.parse(raw);
+        } catch {
+            return NextResponse.json({ error: "No data found for this key" }, { status: 404 });
         }
+        const userData = existingData[key];
+        if (!userData) return NextResponse.json({ error: "No data found for this key" }, { status: 404 });
 
-        const db = await readDataStore();
-        const userData = db[key];
-
-        if (!userData) {
-            return NextResponse.json({ error: "No data found" }, { status: 404 });
-        }
-
+        // ================== Simple response filter ==================
         const simpleResponses: Record<string, string> = {
             "شكرا لك": "على الرحب والسعة! 😊",
             "شكراً لك": "على الرحب والسعة! 😊",
@@ -313,152 +287,69 @@ export async function GET(req: NextRequest) {
             مرحبا: "أهلاً! كيف يمكنني مساعدتك اليوم؟ 🙂",
         };
 
-        const lower = question.trim().toLowerCase();
-
-        if (simpleResponses[lower]) {
+        const lowerQuestion = question.trim().toLowerCase();
+        if (simpleResponses[lowerQuestion]) {
+            // Save history even for simple replies
             userData.history = userData.history || [];
-            userData.history.push({
-                question,
-                answer: simpleResponses[lower],
-            });
+            userData.history.push({ question, answer: simpleResponses[lowerQuestion] });
+            existingData[key] = userData;
+            await fs.writeFile(dataFile, JSON.stringify(existingData, null, 2), "utf-8");
 
-            db[key] = userData;
-            await writeDataStore(db);
-
-            return NextResponse.json({
-                answer: simpleResponses[lower],
-            });
+            return NextResponse.json({ answer: simpleResponses[lowerQuestion] });
         }
 
-        const lang = /[ء-ي]/.test(question) ? "Arabic" : "English";
+        const questionLang = /[ء-ي]/.test(question) ? "ar" : "en";
 
-        const history =
-            userData.history
-                ?.map(
-                    (h) => `User:${h.question}
-Assistant:${h.answer}`
-                )
-                .join("\n") || "";
+        // ================= OpenRouter LLM call =================
+        const OR_KEY = process.env.OPENROUTER_API_KEY;
+        const OR_MODEL = process.env.OPENROUTER_MODEL || "meta-llama/llama-3.1-8b-instruct";
 
-        // التعديل هنا: تحسين الـ Prompt ليكون توجيهياً
+        const historyText =
+            userData.history?.map((h) => `User: ${h.question}\nAssistant: ${h.answer}`).join("\n") || "";
+
         const prompt = `
-You are an expert assistant. Your task is to help the user with the provided OCR text.
-If the user asks to translate, perform an accurate, natural-sounding translation.
-
-OCR Text:
-${userData.correctedText || userData.text}
-
-History:
-${history}
-
-User Question:
-${question}
-
-Instructions:
-1. Provide a direct, helpful response.
-2. If the question is about translation, translate the OCR text into the requested language naturally.
-3. Do not include technical metadata (like accuracy percentages or notes) in your answer unless specifically asked.
-4. Answer in ${lang}.
+You are a super-intelligent assistant like ChatGPT.
+Extracted text: "${userData.correctedText || userData.text}"
+Accuracy: ${userData.accuracy ?? "unknown"}%
+Notes: ${userData.notes?.join("; ") || "No notes"}
+Conversation history:
+${historyText}
+User question: "${question}"
+Language: ${questionLang === "ar" ? "Arabic" : "English"}
+Answer clearly, helpfully, with examples if possible, in user's language, using context and notes.
 `;
 
+        const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+            method: "POST",
+            headers: { Authorization: `Bearer ${OR_KEY}`, "Content-Type": "application/json" },
+            body: JSON.stringify({
+                model: OR_MODEL,
+                messages: [{ role: "user", content: prompt }],
+                temperature: 0.7,
+                max_tokens: 700,
+            }),
+        });
+
         let answer = "";
-        let fallback = false;
-
-        try {
-            const openRouterKey = process.env.OPENROUTER_API_KEY;
-
-            if (!openRouterKey) throw new Error("Missing OpenRouter key");
-
-            const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-                method: "POST",
-                headers: {
-                    Authorization: `Bearer ${openRouterKey}`,
-                    "Content-Type": "application/json",
-                    "HTTP-Referer": process.env.NEXT_PUBLIC_APP_URL || "",
-                    "X-Title": "OCR Assistant",
-                },
-                body: JSON.stringify({
-                    model: process.env.OPENROUTER_MODEL || "meta-llama/llama-3.1-8b-instruct",
-                    messages: [
-                        {
-                            role: "user",
-                            content: prompt,
-                        },
-                    ],
-                    temperature: 0.7,
-                    max_tokens: 700,
-                }),
-            });
-
-            if (!response.ok) throw new Error("OpenRouter failed");
-
+        if (response.ok) {
             const data = await response.json();
-            answer = data.choices?.[0]?.message?.content || "";
-        } catch (e) {
-            fallback = true;
+            answer = data.choices?.[0]?.message?.content || generateLocalReply(userData, question);
+        } else {
+            answer = generateLocalReply(userData, question);
         }
 
-        if (fallback || !answer) {
-            try {
-                const geminiKey = process.env.GEMINI_API_KEY;
-
-                if (!geminiKey) throw new Error("Missing Gemini key");
-
-                const response = await fetch(
-                    `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiKey}`,
-                    {
-                        method: "POST",
-                        headers: {
-                            "Content-Type": "application/json",
-                        },
-                        body: JSON.stringify({
-                            contents: [
-                                {
-                                    parts: [
-                                        {
-                                            text: prompt,
-                                        },
-                                    ],
-                                },
-                            ],
-                            generationConfig: {
-                                temperature: 0.7,
-                                maxOutputTokens: 700,
-                            },
-                        }),
-                    }
-                );
-
-                if (!response.ok) throw new Error("Gemini failed");
-
-                const data = await response.json();
-                answer = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
-            } catch (e) {
-                answer = generateLocalReply(userData, question);
-            }
-        }
-
+        // ================= Save history ==================
         userData.history = userData.history || [];
-        userData.history.push({
-            question,
-            answer,
-        });
+        userData.history.push({ question, answer });
+        existingData[key] = userData;
+        await fs.writeFile(dataFile, JSON.stringify(existingData, null, 2), "utf-8");
 
-        db[key] = userData;
-        await writeDataStore(db);
-
-        return NextResponse.json({
-            answer,
-        });
-    } catch (e: any) {
+        return NextResponse.json({ answer });
+    } catch (err) {
+        console.error(err);
         return NextResponse.json(
-            {
-                error: "Failed to fetch answer",
-                details: e.message,
-            },
-            {
-                status: 500,
-            }
+            { error: "Failed to fetch chat answer", details: (err as Error).message },
+            { status: 500 },
         );
     }
 }
