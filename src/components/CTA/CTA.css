@@ -10,6 +10,7 @@
 
 .CTA-content {
   max-width: 1280px;
+  width: 100%;
 }
 
 .icon {
@@ -35,8 +36,8 @@
 }
 
 .cta-btn {
-  background-color:var(--Landing-Bg);
-  color:var(--Primary-Dark);
+  background-color: var(--Landing-Bg);
+  color: var(--Primary-Dark);
   border: none;
   padding: 14px 32px;
   border-radius: 999px;
@@ -45,10 +46,90 @@
   cursor: pointer;
   transition: all 0.3s ease;
   text-decoration: none;
+  display: inline-block;
 }
 
 .cta-btn:hover {
-  background-color:var(--Landing-Bg);
+  background-color: var(--Landing-Bg);
   transform: translateY(-2px);
 }
- 
+
+@media (max-width: 1024px) {
+  .CTA {
+    min-height: 40vh;
+    padding: 56px 24px;
+  }
+
+  .CTA h1 {
+    font-size: 36px;
+  }
+
+  .CTA p {
+    font-size: 18px;
+    margin-bottom: 24px;
+  }
+
+  .cta-btn {
+    font-size: 18px;
+    padding: 12px 28px;
+  }
+
+  .icon img {
+    width: 110px;
+  }
+}
+
+
+@media (max-width: 768px) {
+  .CTA {
+    padding: 48px 20px;
+  }
+
+  .CTA h1 {
+    font-size: 28px;
+    margin-bottom: 12px;
+  }
+
+  .CTA p {
+    font-size: 16px;
+    margin-bottom: 20px;
+  }
+
+  .cta-btn {
+    font-size: 16px;
+    padding: 11px 24px;
+  }
+
+  .icon {
+    margin-bottom: 16px;
+  }
+
+  .icon img {
+    width: 80px;
+  }
+}
+
+@media (max-width: 480px) {
+  .CTA {
+    padding: 40px 16px;
+    min-height: auto;
+  }
+
+  .CTA h1 {
+    font-size: 22px;
+  }
+
+  .CTA p {
+    font-size: 14px;
+    margin-bottom: 18px;
+  }
+
+  .cta-btn {
+    font-size: 14px;
+    padding: 10px 20px;
+  }
+
+  .icon img {
+    width: 64px;
+  }
+}

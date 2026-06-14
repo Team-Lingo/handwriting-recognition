@@ -156,3 +156,91 @@
   z-index: 0;
 }
 
+/* ── 1024px ─────────────────────────────────────── */
+@media (max-width: 1024px) {
+  .hero {
+    min-height: 580px;
+  }
+
+  .hero-title {
+    font-size: clamp(2rem, 4.5vw, 3rem);
+  }
+
+  .hero-subtitle {
+    font-size: clamp(0.95rem, 2vw, 1.15rem);
+    max-width: 600px;
+  }
+
+  .hero-wave {
+    height: 120px;
+  }
+}
+
+@media (max-width: 768px) {
+  .hero {
+    min-height: 480px;
+  }
+
+  .hero-badge {
+    font-size: 13px;
+    padding: 6px 16px;
+    margin-bottom: 18px;
+  }
+
+  .hero-title {
+    font-size: clamp(1.75rem, 6vw, 2.5rem);
+    margin-bottom: 16px;
+  }
+
+  .hero-subtitle {
+    font-size: 1rem;
+    margin-bottom: 28px;
+    max-width: 90%;
+  }
+
+  .hero-buttons {
+    gap: 12px;
+  }
+
+  .icon-1 { font-size: 32px; }
+  .icon-2 { font-size: 24px; }
+  .icon-3 { font-size: 28px; }
+  .icon-4 { font-size: 26px; }
+  .icon-5 { font-size: 28px; }
+  .icon-6 { font-size: 30px; }
+
+  .hero-wave {
+    height: 80px;
+  }
+}
+
+@media (max-width: 480px) {
+  .hero-badge {
+    font-size: 12px;
+    padding: 5px 14px;
+  }
+
+  .hero-title {
+    font-size: clamp(1.5rem, 7vw, 2rem);
+  }
+
+  .hero-subtitle {
+    font-size: 0.9375rem;
+    max-width: 100%;
+  }
+
+  .btn-primary-solid,
+  .btn-secondary-outline {
+    padding: 11px 22px;
+    font-size: 14px;
+  }
+
+  .icon-4,
+  .icon-3 {
+    display: none;
+  }
+
+  .hero-wave {
+    height: 60px;
+  }
+}
