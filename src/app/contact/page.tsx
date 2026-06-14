@@ -1,12 +1,14 @@
 import React from 'react'
 import Navbar from '@/components/Navbar/Navbar';
-import ComingSoon from '@/components/ComingSoon/ComingSoon';
+import Contact from '@/components/Contact/Contact';
+import Footer from '@/components/Footer/Footer';
 
 const contactPage = () => {
   return (
     <>
       <Navbar />
-      <ComingSoon />
+      <Contact />
+      <Footer />
     </>
   )
 }
