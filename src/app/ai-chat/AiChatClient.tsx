@@ -24,23 +24,6 @@ interface Message {
     timestamp: Date;
 }
 
-// ---------------------------------------------------------------------------
-// TODO (for your Demiana ): replace this stub with the real AI call.
-// messages     — full conversation history
-// userMessage  — new user text (may be empty if only files were sent)
-// attachments  — files for this message; dataUrl holds base64-encoded content
-// ---------------------------------------------------------------------------
-async function sendMessageToAI(
-    messages: Message[],
-    userMessage: string,
-    attachments: Attachment[],
-): Promise<string> {
-    void messages;
-    void userMessage;
-    void attachments;
-    return "AI response coming soon — backend not connected yet.";
-}
-
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB
 
 function createId() {
@@ -64,10 +47,25 @@ export default function AiChatClient() {
     const [busy, setBusy] = useState(false);
     const [pendingAttachments, setPendingAttachments] = useState<Attachment[]>([]);
     const [attachError, setAttachError] = useState<string | null>(null);
+    
+    const [ocrKey, setOcrKey] = useState<string | null>(() => {
+        if (typeof window !== "undefined") {
+            return localStorage.getItem("ocr_session_key");
+        }
+        return null;
+    });
 
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const textareaRef = useRef<HTMLTextAreaElement>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
+
+    useEffect(() => {
+        if (ocrKey) {
+            localStorage.setItem("ocr_session_key", ocrKey);
+        } else {
+            localStorage.removeItem("ocr_session_key");
+        }
+    }, [ocrKey]);
 
     useEffect(() => {
         if (!loading && !user) {
@@ -100,7 +98,6 @@ export default function AiChatClient() {
             };
             reader.readAsDataURL(file);
         }
-
         if (fileInputRef.current) fileInputRef.current.value = "";
     };
 
@@ -112,37 +109,52 @@ export default function AiChatClient() {
         const text = input.trim();
         if ((!text && pendingAttachments.length === 0) || busy) return;
 
-        const userMsg: Message = {
-            id: createId(),
-            role: "user",
-            content: text,
-            attachments: pendingAttachments.length > 0 ? [...pendingAttachments] : undefined,
-            timestamp: new Date(),
-        };
-
-        setMessages((prev) => [...prev, userMsg]);
-        setInput("");
-        setPendingAttachments([]);
-        setAttachError(null);
         setBusy(true);
-
-        if (textareaRef.current) textareaRef.current.style.height = "auto";
+        let currentKey = ocrKey;
 
         try {
-            const reply = await sendMessageToAI([...messages, userMsg], text, userMsg.attachments ?? []);
+            if (pendingAttachments.length > 0) {
+                const formData = new FormData();
+                const fileResponse = await fetch(pendingAttachments[0].dataUrl);
+                const blob = await fileResponse.blob();
+                formData.append("file", blob, pendingAttachments[0].name);
+
+                const res = await fetch("/api/ocr", { method: "POST", body: formData });
+                const data = await res.json();
+                
+                if (data.key) {
+                    currentKey = data.key;
+                    setOcrKey(data.key);
+                }
+            }
+
+            const userMsg: Message = {
+                id: createId(),
+                role: "user",
+                content: text,
+                attachments: pendingAttachments.length > 0 ? [...pendingAttachments] : undefined,
+                timestamp: new Date(),
+            };
+
+            setMessages((prev) => [...prev, userMsg]);
+            setInput("");
+            setPendingAttachments([]);
+            if (textareaRef.current) textareaRef.current.style.height = "auto";
+
+            const queryParams = new URLSearchParams({ question: text });
+            if (currentKey) queryParams.append("key", currentKey);
+            
+            const res = await fetch(`/api/ocr?${queryParams.toString()}`);
+            const data = await res.json();
+
             setMessages((prev) => [
                 ...prev,
-                { id: createId(), role: "assistant", content: reply, timestamp: new Date() },
+                { id: createId(), role: "assistant", content: data.answer || "عذراً، لم أستطع الرد.", timestamp: new Date() },
             ]);
-        } catch {
+        } catch (e: any) {
             setMessages((prev) => [
                 ...prev,
-                {
-                    id: createId(),
-                    role: "assistant",
-                    content: "Something went wrong. Please try again.",
-                    timestamp: new Date(),
-                },
+                { id: createId(), role: "assistant", content: "عذراً، حدث خطأ في الاتصال بالسيرفر.", timestamp: new Date() },
             ]);
         } finally {
             setBusy(false);
@@ -162,16 +174,7 @@ export default function AiChatClient() {
         e.target.style.height = `${Math.min(e.target.scrollHeight, 160)}px`;
     };
 
-    if (loading || !user) {
-        return (
-            <div className="dashboard-layout">
-                <DashboardSidebar user={user} userProfile={userProfile} />
-                <main className="dashboard-main">
-                    <div className="loading-container">Loading…</div>
-                </main>
-            </div>
-        );
-    }
+    if (loading || !user) return <div className="dashboard-layout"><div className="loading-container">Loading…</div></div>;
 
     return (
         <div className="dashboard-layout">
@@ -179,152 +182,54 @@ export default function AiChatClient() {
             <main className="dashboard-main">
                 <div className="dashboard-content ai-chat-page">
                     <DashboardHeader userName={firstName} />
-
                     <div className="ai-chat-container">
                         <div className="ai-chat-header">
                             <span className="ai-chat-header-icon"><MdChat /></span>
                             <div>
                                 <h2 className="ai-chat-title">AI Assistant</h2>
-                                <p className="ai-chat-subtitle">Ask anything — attach images or files for context</p>
+                                <p className="ai-chat-subtitle">Ask anything - attach images or files for context</p>
                             </div>
                         </div>
 
                         <div className="ai-chat-messages">
-                            {messages.length === 0 && (
-                                <div className="ai-chat-empty">
-                                    <span className="ai-chat-empty-icon"><MdChat /></span>
-                                    <p className="ai-chat-empty-title">Start a conversation</p>
-                                    <p className="ai-chat-empty-sub">
-                                        Ask the AI about your handwritten documents or translations.
-                                        You can also attach images, PDFs, and more.
-                                    </p>
-                                </div>
-                            )}
-
                             {messages.map((msg) => (
                                 <div key={msg.id} className={`ai-chat-bubble-row ${msg.role}`}>
-                                    {msg.role === "assistant" && (
-                                        <div className="ai-chat-avatar ai"><MdChat /></div>
-                                    )}
-
+                                    {msg.role === "assistant" && <div className="ai-chat-avatar ai"><MdChat /></div>}
                                     <div className={`ai-chat-bubble ${msg.role}`}>
-                                        {msg.attachments && msg.attachments.length > 0 && (
-                                            <div className="ai-chat-attachments">
-                                                {msg.attachments.map((att) =>
-                                                    att.type.startsWith("image/") ? (
-                                                        // eslint-disable-next-line @next/next/no-img-element
-                                                        <img
-                                                            key={att.id}
-                                                            src={att.dataUrl}
-                                                            alt={att.name}
-                                                            className="ai-chat-attachment-img"
-                                                        />
-                                                    ) : (
-                                                        <div key={att.id} className="ai-chat-attachment-file">
-                                                            <MdInsertDriveFile className="ai-chat-attachment-file-icon" />
-                                                            <div className="ai-chat-attachment-file-info">
-                                                                <span className="ai-chat-attachment-file-name">{att.name}</span>
-                                                                <span className="ai-chat-attachment-file-size">{formatBytes(att.size)}</span>
-                                                            </div>
-                                                        </div>
-                                                    )
-                                                )}
+                                        {msg.attachments && (
+                                            <div className="msg-attachments">
+                                                {msg.attachments.map(a => (
+                                                    <div key={a.id} className="msg-attachment-item"><MdInsertDriveFile /> {a.name}</div>
+                                                ))}
                                             </div>
                                         )}
-
                                         {msg.content && <p>{msg.content}</p>}
-
-                                        <span className="ai-chat-time">
-                                            {msg.timestamp.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-                                        </span>
                                     </div>
-
-                                    {msg.role === "user" && (
-                                        <div className="ai-chat-avatar user">{firstName[0]?.toUpperCase()}</div>
-                                    )}
                                 </div>
                             ))}
-
-                            {busy && (
-                                <div className="ai-chat-bubble-row assistant">
-                                    <div className="ai-chat-avatar ai"><MdChat /></div>
-                                    <div className="ai-chat-bubble assistant ai-chat-typing">
-                                        <span /><span /><span />
-                                    </div>
-                                </div>
-                            )}
-
+                            {busy && <div className="ai-chat-bubble-row assistant"><div className="ai-chat-bubble assistant">جاري التفكير...</div></div>}
                             <div ref={messagesEndRef} />
                         </div>
 
+                        {/* منطقة معاينة الملفات المرفقة */}
+                        {pendingAttachments.length > 0 && (
+                            <div className="ai-chat-attachments-preview">
+                                {pendingAttachments.map((file) => (
+                                    <div key={file.id} className="attachment-preview-item">
+                                        <MdInsertDriveFile />
+                                        <span>{file.name} ({formatBytes(file.size)})</span>
+                                        <button onClick={() => removePendingAttachment(file.id)}><MdClose /></button>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+
                         <div className="ai-chat-input-wrapper">
-                            {pendingAttachments.length > 0 && (
-                                <div className="ai-chat-pending-attachments">
-                                    {pendingAttachments.map((att) => (
-                                        <div key={att.id} className="ai-chat-pending-chip">
-                                            {att.type.startsWith("image/") ? (
-                                                // eslint-disable-next-line @next/next/no-img-element
-                                                <img
-                                                    src={att.dataUrl}
-                                                    alt={att.name}
-                                                    className="ai-chat-pending-thumb"
-                                                />
-                                            ) : (
-                                                <MdInsertDriveFile className="ai-chat-pending-file-icon" />
-                                            )}
-                                            <span className="ai-chat-pending-name">{att.name}</span>
-                                            <button
-                                                className="ai-chat-pending-remove"
-                                                onClick={() => removePendingAttachment(att.id)}
-                                                aria-label={`Remove ${att.name}`}
-                                            >
-                                                <MdClose />
-                                            </button>
-                                        </div>
-                                    ))}
-                                </div>
-                            )}
-
-                            {attachError && <p className="ai-chat-attach-error">{attachError}</p>}
-
                             <div className="ai-chat-input-area">
-                                <input
-                                    ref={fileInputRef}
-                                    type="file"
-                                    className="ai-chat-file-input"
-                                    accept="image/*,application/pdf,.pdf,.docx,.doc,.pptx,.txt"
-                                    multiple
-                                    onChange={(e) => handleFileSelect(e.target.files)}
-                                />
-                                <button
-                                    className="ai-chat-attach-btn"
-                                    onClick={() => fileInputRef.current?.click()}
-                                    disabled={busy}
-                                    aria-label="Attach file"
-                                    title="Attach image or file (PDF, DOCX, TXT…)"
-                                >
-                                    <MdAttachFile />
-                                </button>
-
-                                <textarea
-                                    ref={textareaRef}
-                                    className="ai-chat-input"
-                                    placeholder="Type a message…"
-                                    value={input}
-                                    onChange={handleInputChange}
-                                    onKeyDown={handleKeyDown}
-                                    rows={1}
-                                    disabled={busy}
-                                />
-
-                                <button
-                                    className="ai-chat-send-btn"
-                                    onClick={() => void handleSend()}
-                                    disabled={busy || (!input.trim() && pendingAttachments.length === 0)}
-                                    aria-label="Send message"
-                                >
-                                    <MdSend />
-                                </button>
+                                <input ref={fileInputRef} type="file" className="ai-chat-file-input" onChange={(e) => handleFileSelect(e.target.files)} hidden />
+                                <button className="ai-chat-attach-btn" onClick={() => fileInputRef.current?.click()}><MdAttachFile /></button>
+                                <textarea ref={textareaRef} className="ai-chat-input" placeholder="اسألني أي شيء..." value={input} onChange={handleInputChange} onKeyDown={handleKeyDown} rows={1} />
+                                <button className="ai-chat-send-btn" onClick={() => void handleSend()} disabled={busy}><MdSend /></button>
                             </div>
                         </div>
                     </div>
