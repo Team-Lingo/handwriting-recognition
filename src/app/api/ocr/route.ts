@@ -268,7 +268,6 @@ export async function POST(req: NextRequest) {
 
         const db = await readDataStore();
 
-        // التعديل المطلوب: تم تحديث الـ key ليعتمد على الـ text فقط
         const key = crypto
             .createHash("md5")
             .update(text)
@@ -305,7 +304,6 @@ export async function GET(req: NextRequest) {
             return NextResponse.json({ error: "No data found" }, { status: 404 });
         }
 
-        // ================= Simple Replies =================
         const simpleResponses: Record<string, string> = {
             "شكرا لك": "على الرحب والسعة! 😊",
             "شكراً لك": "على الرحب والسعة! 😊",
@@ -332,7 +330,6 @@ export async function GET(req: NextRequest) {
             });
         }
 
-        // ================= Prompt =================
         const lang = /[ء-ي]/.test(question) ? "Arabic" : "English";
 
         const history =
@@ -343,36 +340,30 @@ Assistant:${h.answer}`
                 )
                 .join("\n") || "";
 
+        // التعديل هنا: تحسين الـ Prompt ليكون توجيهياً
         const prompt = `
-You are an intelligent AI assistant.
+You are an expert assistant. Your task is to help the user with the provided OCR text.
+If the user asks to translate, perform an accurate, natural-sounding translation.
 
 OCR Text:
 ${userData.correctedText || userData.text}
 
-
-Accuracy:
-${userData.accuracy ?? "unknown"}%
-
-
-Notes:
-${userData.notes?.join(";") || "none"}
-
-
 History:
 ${history}
 
-
-Question:
+User Question:
 ${question}
 
-
-Answer in ${lang}.
+Instructions:
+1. Provide a direct, helpful response.
+2. If the question is about translation, translate the OCR text into the requested language naturally.
+3. Do not include technical metadata (like accuracy percentages or notes) in your answer unless specifically asked.
+4. Answer in ${lang}.
 `;
 
         let answer = "";
         let fallback = false;
 
-        // ================= OpenRouter =================
         try {
             const openRouterKey = process.env.OPENROUTER_API_KEY;
 
@@ -407,7 +398,6 @@ Answer in ${lang}.
             fallback = true;
         }
 
-        // ================= Gemini Fallback =================
         if (fallback || !answer) {
             try {
                 const geminiKey = process.env.GEMINI_API_KEY;
@@ -448,7 +438,6 @@ Answer in ${lang}.
             }
         }
 
-        // ================= Save History =================
         userData.history = userData.history || [];
         userData.history.push({
             question,
