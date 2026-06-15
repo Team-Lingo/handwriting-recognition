@@ -49,17 +49,34 @@ export default function AiChatClient() {
     const [pendingAttachments, setPendingAttachments] = useState<Attachment[]>([]);
 
     const [ocrKey, setOcrKey] = useState<string | null>(() => {
-        if (typeof window !== "undefined") return localStorage.getItem("ocr_session_key");
+        if (typeof window !== "undefined") {
+            return localStorage.getItem("ocr_session_key");
+        }
         return null;
     });
 
     const [sessionId, setSessionId] = useState<string | null>(() => {
-        if (typeof window !== "undefined") return localStorage.getItem("chat_session_id");
+        if (typeof window !== "undefined") {
+            return localStorage.getItem("chat_session_id");
+        }
         return null;
     });
 
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
+
+    
+    useEffect(() => {
+        if (!user) return;
+
+        const fixedKey =
+            user.uid ||
+            localStorage.getItem("ocr_session_key") ||
+            `user_${createId()}`;
+
+        setOcrKey(fixedKey);
+        localStorage.setItem("ocr_session_key", fixedKey);
+    }, [user]);
 
     useEffect(() => {
         if (ocrKey) localStorage.setItem("ocr_session_key", ocrKey);
@@ -79,21 +96,42 @@ export default function AiChatClient() {
         messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
     }, [messages, busy]);
 
-    const firstName = userProfile?.firstName || user?.displayName?.split(" ")[0] || "User";
+    const firstName =
+        userProfile?.firstName ||
+        user?.displayName?.split(" ")[0] ||
+        "User";
 
     const handleNewChat = async () => {
         setMessages([]);
         setInput("");
         setPendingAttachments([]);
-        setSessionId(null);
+
         try {
+            const currentKey =
+                ocrKey ||
+                user?.uid ||
+                localStorage.getItem("ocr_session_key") ||
+                `user_${createId()}`;
+
+            setOcrKey(currentKey);
+            localStorage.setItem("ocr_session_key", currentKey);
+
             const res = await fetch("/api/chat-bot", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ key: ocrKey || `anon_${Date.now()}`, question: "new chat", newChat: true })
+                body: JSON.stringify({
+                    key: currentKey,
+                    question: "new chat",
+                    newChat: true
+                })
             });
+
             const data = await res.json();
-            if (data.sessionId) setSessionId(data.sessionId);
+
+            if (data.sessionId) {
+                setSessionId(data.sessionId);
+                localStorage.setItem("chat_session_id", data.sessionId);
+            }
         } catch (err) {
             console.log(err);
         }
@@ -101,17 +139,27 @@ export default function AiChatClient() {
 
     const handleFileSelect = (files: FileList | null) => {
         if (!files) return;
+
         for (const file of Array.from(files)) {
             if (file.size > MAX_FILE_SIZE) continue;
+
             const reader = new FileReader();
             reader.onload = (e) => {
                 setPendingAttachments((prev) => [
                     ...prev,
-                    { id: createId(), name: file.name, type: file.type, dataUrl: e.target?.result as string, size: file.size }
+                    {
+                        id: createId(),
+                        name: file.name,
+                        type: file.type,
+                        dataUrl: e.target?.result as string,
+                        size: file.size
+                    }
                 ]);
             };
+
             reader.readAsDataURL(file);
         }
+
         if (fileInputRef.current) fileInputRef.current.value = "";
     };
 
@@ -120,14 +168,29 @@ export default function AiChatClient() {
         if (busy || (!text && pendingAttachments.length === 0)) return;
 
         setBusy(true);
-        let currentKey = ocrKey || `anon_${Date.now()}`;
 
-        // نسخ الملفات للإرسال قبل مسح الـ state
+        let currentKey =
+            ocrKey ||
+            user?.uid ||
+            localStorage.getItem("ocr_session_key");
+
+        if (!currentKey) {
+            currentKey = `user_${createId()}`;
+            setOcrKey(currentKey);
+            localStorage.setItem("ocr_session_key", currentKey);
+        }
+
         const attachmentsToSend = [...pendingAttachments];
 
         setMessages((prev) => [
             ...prev,
-            { id: createId(), role: "user", content: text, attachments: attachmentsToSend, timestamp: new Date() }
+            {
+                id: createId(),
+                role: "user",
+                content: text,
+                attachments: attachmentsToSend,
+                timestamp: new Date()
+            }
         ]);
 
         setInput("");
@@ -139,20 +202,33 @@ export default function AiChatClient() {
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                     key: currentKey,
+                    sessionId,
                     question: text,
-                    attachments: attachmentsToSend // تم إضافة المرفقات هنا
+                    newChat: false,
+                    attachments: attachmentsToSend
                 })
             });
 
             const data = await response.json();
+
             setMessages((prev) => [
                 ...prev,
-                { id: createId(), role: "assistant", content: data.answer || data.error, timestamp: new Date() }
+                {
+                    id: createId(),
+                    role: "assistant",
+                    content: data.answer || data.error,
+                    timestamp: new Date()
+                }
             ]);
         } catch {
             setMessages((prev) => [
                 ...prev,
-                { id: createId(), role: "assistant", content: "حدث خطأ في الاتصال بالسيرفر.", timestamp: new Date() }
+                {
+                    id: createId(),
+                    role: "assistant",
+                    content: "حدث خطأ في الاتصال بالسيرفر.",
+                    timestamp: new Date()
+                }
             ]);
         } finally {
             setBusy(false);
@@ -167,24 +243,36 @@ export default function AiChatClient() {
             <main className="dashboard-main">
                 <div className="dashboard-content ai-chat-page">
                     <DashboardHeader userName={firstName} />
+
                     <div className="ai-chat-container">
                         <div className="new-chat-wrapper">
-                            <button className="new-chat-btn" onClick={handleNewChat}>+ New Chat</button>
+                            <button className="new-chat-btn" onClick={handleNewChat}>
+                                + New Chat
+                            </button>
                         </div>
+
                         <div className="ai-chat-header">
                             <div className="ai-icon"><MdChat /></div>
-                            <div><h2>AI Assistant</h2><p>Ask anything - attach files</p></div>
+                            <div>
+                                <h2>AI Assistant</h2>
+                                <p>Ask anything - attach files</p>
+                            </div>
                         </div>
 
                         <div className="ai-chat-messages">
                             {messages.map((msg) => (
                                 <div key={msg.id} className={`ai-chat-bubble-row ${msg.role}`}>
-                                    {msg.role === "assistant" && <div className="ai-chat-avatar"><MdChat /></div>}
+                                    {msg.role === "assistant" && (
+                                        <div className="ai-chat-avatar"><MdChat /></div>
+                                    )}
+
                                     <div className={`ai-chat-bubble ${msg.role}`}>
                                         {msg.attachments && (
                                             <div className="msg-attachments">
                                                 {msg.attachments.map((a) => (
-                                                    <div key={a.id}><MdInsertDriveFile /> {a.name}</div>
+                                                    <div key={a.id}>
+                                                        <MdInsertDriveFile /> {a.name}
+                                                    </div>
                                                 ))}
                                             </div>
                                         )}
@@ -192,35 +280,69 @@ export default function AiChatClient() {
                                     </div>
                                 </div>
                             ))}
-                            {busy && <div className="ai-chat-bubble assistant">جاري التفكير...</div>}
+
+                            {busy && (
+                                <div className="ai-chat-bubble assistant">
+                                    جاري التفكير...
+                                </div>
+                            )}
+
                             <div ref={messagesEndRef} />
                         </div>
 
-                        {/* منطقة عرض الملفات المعلقة قبل الإرسال */}
                         {pendingAttachments.length > 0 && (
                             <div className="pending-attachments">
                                 {pendingAttachments.map((a) => (
                                     <span key={a.id} className="attachment-tag">
-                                        {a.name} <MdClose onClick={() => setPendingAttachments(prev => prev.filter(p => p.id !== a.id))} />
+                                        {a.name}
+                                        <MdClose
+                                            onClick={() =>
+                                                setPendingAttachments((prev) =>
+                                                    prev.filter((p) => p.id !== a.id)
+                                                )
+                                            }
+                                        />
                                     </span>
                                 ))}
                             </div>
                         )}
 
                         <div className="ai-chat-input-wrapper">
-                            <input ref={fileInputRef} type="file" hidden onChange={(e) => handleFileSelect(e.target.files)} />
-                            <button className="attach-btn" onClick={() => fileInputRef.current?.click()}><MdAttachFile /></button>
-                            <textarea value={input} onChange={(e) => setInput(e.target.value)} placeholder="Ask me anything..." />
-                            <button className="send-btn" disabled={busy} onClick={handleSend}><MdSend /></button>
+                            <input
+                                ref={fileInputRef}
+                                type="file"
+                                hidden
+                                onChange={(e) => handleFileSelect(e.target.files)}
+                            />
+
+                            <button
+                                className="attach-btn"
+                                onClick={() => fileInputRef.current?.click()}
+                            >
+                                <MdAttachFile />
+                            </button>
+
+                            <textarea
+                                value={input}
+                                onChange={(e) => setInput(e.target.value)}
+                                placeholder="Ask me anything..."
+                            />
+
+                            <button
+                                className="send-btn"
+                                disabled={busy}
+                                onClick={handleSend}
+                            >
+                                <MdSend />
+                            </button>
                         </div>
                     </div>
                 </div>
             </main>
 
             <style jsx>{`
-                .pending-attachments { display: flex; gap: 5px; padding: 5px 15px; background: #f0f0f0; }
-                .attachment-tag { display: flex; align-items: center; background: #e0e0e0; padding: 2px 8px; border-radius: 4px; font-size: 12px; }
-                /* ... باقي الـ styles القديمة ... */
+                .pending-attachments { display:flex; gap:5px; padding:5px 15px; background:#f0f0f0; }
+                .attachment-tag { display:flex; align-items:center; background:#e0e0e0; padding:2px 8px; border-radius:4px; font-size:12px; }
                 .ai-chat-page{ height:calc(100vh - 90px); display:flex; justify-content:center; align-items:center; }
                 .ai-chat-container{ width:100%; max-width:1100px; height:85vh; background:white; border-radius:18px; border:1px solid #e5e7eb; box-shadow:0 10px 30px #00000012; padding:14px; display:flex; flex-direction:column; }
                 .new-chat-wrapper{ display:flex; justify-content:flex-end; margin-bottom:10px; }
