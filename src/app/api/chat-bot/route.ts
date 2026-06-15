@@ -40,6 +40,7 @@ interface AnalysisData {
   conversationSummary?: string;
 }
 
+
 async function readDataStore() {
   try {
     return JSON.parse(await fs.readFile(dataFile, "utf8"));
@@ -53,13 +54,11 @@ async function writeDataStore(data: any) {
   await fs.writeFile(dataFile, JSON.stringify(data, null, 2));
 }
 
-
 function semanticScore(text: string, query: string) {
   const tokens = query.toLowerCase().split(" ").filter(w => w.length > 2);
   const target = text.toLowerCase();
 
   let score = 0;
-
   for (const t of tokens) if (target.includes(t)) score += 2;
   if (/\d/.test(text)) score += 1;
 
@@ -109,15 +108,15 @@ function sanitizeInput(text: string) {
     .replace(/reveal secrets/gi, "");
 }
 
- 
-
 function isGreeting(q: string) {
   const clean = q.trim().toLowerCase().replace(/[^a-z\u0600-\u06FF]/g, "");
   return /^(hi|hello|hey|مرحبا|اهلا|سلام)$/.test(clean);
 }
 
+
 function createNewSession(userData: AnalysisData) {
   const id = `chat_${Date.now()}`;
+
   userData.sessionId = id;
 
   if (!userData.sessions) userData.sessions = {};
@@ -131,26 +130,38 @@ function getSession(userData: AnalysisData) {
   return userData.sessionId;
 }
 
-
 export async function POST(req: NextRequest) {
   try {
-    const { key, question, newChat } = await req.json();
+    const body = await req.json().catch(() => ({}));
+    const { key, question, newChat } = body;
 
-    if (!key || !question?.trim()) {
-      return NextResponse.json({ error: "Invalid request" }, { status: 400 });
+    const cleanQuestion = sanitizeInput(question || "");
+
+  
+    const safeKey = key || `anon_${Date.now()}`;
+
+    if (!cleanQuestion.trim()) {
+      return NextResponse.json(
+        { error: "Invalid request: empty question" },
+        { status: 400 }
+      );
     }
 
     const db = await readDataStore();
-    const userData: AnalysisData = db[key];
 
-    if (!userData) {
-      return NextResponse.json({ error: "No analysis data" }, { status: 404 });
+    if (!db[safeKey]) {
+      db[safeKey] = {
+        sessions: {},
+      };
     }
 
- 
+    const userData: AnalysisData = db[safeKey];
+
+    
     if (newChat) {
       const id = createNewSession(userData);
-      db[key] = userData;
+
+      db[safeKey] = userData;
       await writeDataStore(db);
 
       return NextResponse.json({
@@ -166,16 +177,12 @@ export async function POST(req: NextRequest) {
 
     const history = userData.sessions[sessionId];
 
-    const cleanQuestion = sanitizeInput(question);
 
- 
     if (isGreeting(cleanQuestion)) {
       return NextResponse.json({
         success: true,
         answer:
-          "Hello 👋 I can help you with handwriting analysis, OCR, and forgery detection.",
-        evidence: "greeting-rule",
-        recommendations: [],
+          "Hello 👋 How can I help you today?",
         confidence: 1,
         taskType: "greeting",
         emotion: "neutral",
@@ -183,7 +190,6 @@ export async function POST(req: NextRequest) {
       });
     }
 
- 
     const analysisData = {
       extractedText: (userData.text || "").slice(0, 3500),
       accuracy: userData.accuracy ?? null,
@@ -198,39 +204,10 @@ export async function POST(req: NextRequest) {
     const emotion = detectEmotion(cleanQuestion);
     const memory = compressHistory(history);
 
-  const systemPrompt = `
+    const systemPrompt = `
 You are HandwritingAI Pro.
 
-You are a general AI assistant with handwriting analysis capabilities.
-
-RULES:
-
-1) GENERAL QUESTIONS:
-- Answer normally using your AI knowledge.
-- You can answer questions about languages, programming, learning, advice, explanations, etc.
-- Do NOT say "Not enough data" for general questions.
-
-2) HANDWRITING / OCR QUESTIONS:
-- If the user asks about handwriting analysis, OCR text, accuracy, forgery, handwriting quality:
-  use only the provided analysis data.
-- Never invent OCR results, scores, or handwriting measurements.
-- If handwriting data is missing:
-  say:
-  "Not enough handwriting analysis data."
-
-3) STYLE:
-- Be concise.
-- Answer only what was asked.
-- Do not create long tutorials unless requested.
-- Do not ask unnecessary questions.
-
-GREETING:
-If user says hello/hi/hey:
-Reply:
-"Hello 👋 How can I help you today?"
-
 Return ONLY valid JSON:
-
 {
  "answer":"",
  "evidence":"",
@@ -260,10 +237,6 @@ ${memory}
       { role: "user", content: cleanQuestion },
     ];
 
-    /* ---------------- MODEL ---------------- */
-
-    const MODEL = process.env.AI_MODEL || "openai/gpt-4.1-mini";
-
     const response = await fetch(
       "https://openrouter.ai/api/v1/chat/completions",
       {
@@ -273,7 +246,7 @@ ${memory}
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          model: MODEL,
+          model: process.env.AI_MODEL || "openai/gpt-4.1-mini",
           messages,
           temperature: 0,
           top_p: 1,
@@ -303,6 +276,7 @@ ${memory}
     }
 
    
+
     history.push({
       question: cleanQuestion,
       answer: parsed.answer,
@@ -311,14 +285,7 @@ ${memory}
 
     userData.sessions[sessionId] = history.slice(-20);
 
-    if (history.length % 5 === 0) {
-      userData.conversationSummary = history
-        .slice(-5)
-        .map(h => h.question)
-        .join(" | ");
-    }
-
-    db[key] = userData;
+    db[safeKey] = userData;
     await writeDataStore(db);
 
     return NextResponse.json({
@@ -334,7 +301,10 @@ ${memory}
 
   } catch (err: any) {
     return NextResponse.json(
-      { success: false, error: err.message || "Server error" },
+      {
+        success: false,
+        error: err.message || "Server error",
+      },
       { status: 500 }
     );
   }
