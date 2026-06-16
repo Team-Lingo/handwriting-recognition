@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import os from "os";
 import path from "path";
 import fs from "fs/promises";
-import { detectLanguage } from "@/utils/detectLanguage";
 import { ImageAnnotatorClient } from "@google-cloud/vision";
 import pdfParse from "pdf-parse";
 import JSZip from "jszip";
@@ -54,7 +53,7 @@ async function readDataStore() {
   }
 }
 
-async function writeDataStore(data: any) {
+async function writeDataStore(data: unknown) {
   await fs.mkdir(tmpBase, { recursive: true });
   await fs.writeFile(dataFile, JSON.stringify(data, null, 2));
 }
@@ -302,7 +301,8 @@ Return ONLY valid JSON: {"answer":"","evidence":"","recommendations":[],"confide
       emotion,
       sessionId,
     });
-  } catch (err: any) {
-    return NextResponse.json({ success: false, error: err.message || "Server error" }, { status: 500 });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Server error";
+    return NextResponse.json({ success: false, error: message }, { status: 500 });
   }
 }
