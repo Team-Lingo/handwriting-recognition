@@ -224,9 +224,9 @@ export async function POST(req: NextRequest) {
     if (!userData.sessions[sessionId]) userData.sessions[sessionId] = [];
     const history = userData.sessions[sessionId];
 
-    if (uploadedText) {
-      userData.text = ((userData.text || "") + "\n" + uploadedText).trim();
-    }
+   if (uploadedText) {
+  userData.text = uploadedText.trim();
+}
 
     if (isGreeting(cleanQuestion)) {
       return NextResponse.json({
