@@ -250,20 +250,21 @@
         border-top: 1px solid var(--Borders-Lines);
         z-index: 100;
         padding-bottom: env(safe-area-inset-bottom);
+        overflow-x: auto;
     }
 
     .mobile-nav-item {
-        flex: 1;
+        flex: 1 0 auto;
         display: flex;
         flex-direction: column;
         align-items: center;
         justify-content: center;
-        gap: 3px;
+        gap: 2px;
         color: #6b7280;
         text-decoration: none;
-        padding: 8px 4px;
+        padding: 6px 2px;
         transition: color 150ms ease;
-        min-width: 0;
+        min-width: 56px;
     }
 
     .mobile-nav-item.active {

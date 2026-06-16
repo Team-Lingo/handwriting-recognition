@@ -1,10 +1,15 @@
 import "./globals.css";
 import type { ReactNode } from "react";
+import type { Viewport } from "next";
 import FirebaseInit from "@/components/FirebaseInit";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { Montserrat, Atkinson_Hyperlegible } from "next/font/google";
 
 export const metadata = { title: "Handwriting Recognition" };
+
+export const viewport: Viewport = {
+    themeColor: "#1d4ed8",
+};
 
 const montserrat = Montserrat({
   subsets: ["latin"],

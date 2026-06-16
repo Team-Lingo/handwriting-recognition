@@ -48,3 +48,11 @@ next-env.d.ts
 # Ignore PyTorch model weights
 *.pth
 *.pt
+
+# Serwist service worker output
+public/sw.js
+public/swe-worker-*.js
+
+# Android (Bubblewrap)
+/android/
+*.keystore
