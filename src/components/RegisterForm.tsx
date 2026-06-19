@@ -39,6 +39,11 @@ export default function RegisterForm() {
 
         try {
             await signUp(email, password, firstName, lastName);
+            // Clear all fields after a successful registration
+            setFirstName("");
+            setLastName("");
+            setEmail("");
+            setPassword("");
             router.push("/dashboard");
         } catch (err) {
             setError(err instanceof Error ? err.message : "Registration failed");
@@ -51,16 +56,18 @@ export default function RegisterForm() {
         <div className="auth-card">
             <h2 className="auth-title">Create Account</h2>
 
-            <form onSubmit={handleSubmit} className="auth-form">
+            <form onSubmit={handleSubmit} className="auth-form" autoComplete="off">
                 <div className="form-group">
                     <label htmlFor="firstName">First Name</label>
                     <input
                         id="firstName"
+                        name="register-firstName"
                         type="text"
                         value={firstName}
                         onChange={(e) => setFirstName(e.target.value)}
                         required
                         className="form-input"
+                        autoComplete="off"
                     />
                 </div>
 
@@ -68,11 +75,13 @@ export default function RegisterForm() {
                     <label htmlFor="lastName">Last Name</label>
                     <input
                         id="lastName"
+                        name="register-lastName"
                         type="text"
                         value={lastName}
                         onChange={(e) => setLastName(e.target.value)}
                         required
                         className="form-input"
+                        autoComplete="off"
                     />
                 </div>
 
@@ -80,11 +89,13 @@ export default function RegisterForm() {
                     <label htmlFor="email">Email</label>
                     <input
                         id="email"
+                        name="register-email"
                         type="email"
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
                         required
                         className="form-input"
+                        autoComplete="off"
                     />
                 </div>
 
@@ -92,12 +103,14 @@ export default function RegisterForm() {
                     <label htmlFor="password">Password</label>
                     <input
                         id="password"
+                        name="register-password"
                         type="password"
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
                         required
                         minLength={6}
                         className="form-input"
+                        autoComplete="new-password"
                     />
                 </div>
 
